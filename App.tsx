@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language } from './types';
+import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile } from './types';
 import { getBestiesResponse, getSingleBestieResponse } from './services/geminiService';
 import { PERSONAS, locales } from './constants';
 import Sidebar from './components/Sidebar';
@@ -8,6 +8,7 @@ import ChatWindow from './components/ChatWindow';
 import TopBar from './components/TopBar';
 import ContactsView from './components/ContactsView';
 import ProfileCard from './components/ProfileCard';
+import OnboardingModal from './components/OnboardingModal';
 
 export const LocalizationContext = React.createContext({
   t: (key: string) => locales.en[key] || key,
@@ -17,14 +18,40 @@ export const LocalizationContext = React.createContext({
 
 
 const App: React.FC = () => {
-  const [conversations, setConversations] = useState<Partial<Record<ConversationID, Conversation>>>({
-    group: {
-      id: 'group',
-      name: '闺蜜团 (Group Chat)',
-      messages: [{ sender: 'System', text: "Your besties are here! Tell them what's on your mind." }],
-      isGroup: true,
-    },
+  const [conversations, setConversations] = useState<Partial<Record<ConversationID, Conversation>>>(() => {
+    try {
+      const savedConvos = localStorage.getItem('conversations');
+      return savedConvos ? JSON.parse(savedConvos) : {
+        group: {
+          id: 'group',
+          name: '闺蜜团 (Group Chat)',
+          messages: [{ sender: 'System', text: "Your besties are here! Tell them what's on your mind." }],
+          isGroup: true,
+        },
+      };
+    } catch (error) {
+      console.error("Failed to load conversations from localStorage", error);
+      return {
+        group: {
+          id: 'group',
+          name: '闺蜜团 (Group Chat)',
+          messages: [{ sender: 'System', text: "Your besties are here! Tell them what's on your mind." }],
+          isGroup: true,
+        },
+      };
+    }
   });
+
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+      try {
+        const savedProfile = localStorage.getItem('userProfile');
+        return savedProfile ? JSON.parse(savedProfile) : null;
+      } catch (error) {
+        console.error("Failed to load user profile from localStorage", error);
+        return null;
+      }
+  });
+
   const [activeChatId, setActiveChatId] = useState<ConversationID>('group');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [theme, setTheme] = useState<Theme>('light');
@@ -35,6 +62,25 @@ const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('conversations', JSON.stringify(conversations));
+    } catch (error) {
+      console.error("Failed to save conversations to localStorage", error);
+    }
+  }, [conversations]);
+
+  useEffect(() => {
+    try {
+        if (userProfile) {
+            localStorage.setItem('userProfile', JSON.stringify(userProfile));
+        }
+    } catch (error) {
+        console.error("Failed to save user profile to localStorage", error);
+    }
+  }, [userProfile]);
+
 
   const t = useCallback((key: string) => {
     return locales[language][key] || locales['en'][key] || key;
@@ -69,7 +115,7 @@ const App: React.FC = () => {
   }, [activeChatId]);
 
   const handleSendMessage = useCallback(async (text: string, chatId: ConversationID) => {
-    if (!text.trim()) return;
+    if (!text.trim() || !userProfile) return;
     const userMessage: ChatMessage = { sender: 'Me', text };
     
     setConversations(prev => ({
@@ -81,7 +127,7 @@ const App: React.FC = () => {
 
     try {
       if (chatId === 'group') {
-        const aiResponses = await getBestiesResponse(text, language);
+        const aiResponses = await getBestiesResponse(text, language, userProfile);
         aiResponses.forEach((res, index) => {
           setTimeout(() => {
             setConversations(prev => ({
@@ -94,7 +140,7 @@ const App: React.FC = () => {
 
       } else {
         const personaName = chatId as PersonaName;
-        const aiResponse = await getSingleBestieResponse(text, personaName, language);
+        const aiResponse = await getSingleBestieResponse(text, personaName, language, userProfile);
          setConversations(prev => ({
             ...prev,
             [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, aiResponse] }
@@ -110,9 +156,17 @@ const App: React.FC = () => {
       }));
       setIsLoading(false);
     }
-  }, [language]);
+  }, [language, userProfile]);
+
+  const handleSaveProfile = (profile: UserProfile) => {
+    setUserProfile(profile);
+  };
 
   const activeConversation = conversations[activeChatId];
+
+  if (!userProfile) {
+    return <OnboardingModal onSave={handleSaveProfile} />;
+  }
 
   return (
     <LocalizationContext.Provider value={{ t, setLanguage, language }}>

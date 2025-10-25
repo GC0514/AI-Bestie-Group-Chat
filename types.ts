@@ -38,3 +38,8 @@ export type Language = 'en' | 'zh';
 export type LocaleStrings = {
     [key: string]: string;
 };
+
+export interface UserProfile {
+  nickname: string;
+  description: string;
+}

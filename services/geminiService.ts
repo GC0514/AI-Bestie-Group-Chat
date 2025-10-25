@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { ChatMessage, PersonaName, Language } from '../types';
+import type { ChatMessage, PersonaName, Language, UserProfile } from '../types';
 import { getSystemPromptGroup, getSystemPromptSingle } from '../constants';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -25,15 +25,15 @@ const singleResponseSchema = {
     required: ["sender", "text"],
 };
 
-export async function getBestiesResponse(userMessage: string, lang: Language): Promise<ChatMessage[]> {
+export async function getBestiesResponse(userMessage: string, lang: Language, userProfile: UserProfile): Promise<ChatMessage[]> {
   try {
-    const prompt = `The user says: "${userMessage}". Generate the responses from the 8 AI personas.`;
+    const prompt = `The user, ${userProfile.nickname}, says: "${userMessage}". Generate the responses from the 8 AI personas.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        systemInstruction: getSystemPromptGroup(lang),
+        systemInstruction: getSystemPromptGroup(lang, userProfile),
         responseMimeType: "application/json",
         responseSchema: groupResponseSchema,
       }
@@ -53,15 +53,15 @@ export async function getBestiesResponse(userMessage: string, lang: Language): P
   }
 }
 
-export async function getSingleBestieResponse(userMessage: string, personaName: PersonaName, lang: Language): Promise<ChatMessage> {
+export async function getSingleBestieResponse(userMessage: string, personaName: PersonaName, lang: Language, userProfile: UserProfile): Promise<ChatMessage> {
     try {
-        const prompt = `The user says: "${userMessage}". Generate your response.`;
+        const prompt = `${userProfile.nickname} says: "${userMessage}". Generate your response.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
-                systemInstruction: getSystemPromptSingle(personaName, lang),
+                systemInstruction: getSystemPromptSingle(personaName, lang, userProfile),
                 responseMimeType: "application/json",
                 responseSchema: singleResponseSchema,
             }
