@@ -54,6 +54,13 @@ export const ContactsIcon: React.FC<{isActive?: boolean}> = ({ isActive }) => (
     </svg>
 );
 
+export const DiaryIcon: React.FC<{isActive?: boolean; className?: string}> = ({ isActive, className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isActive ? `text-violet-400 ${className}` : `text-[var(--text-color-secondary)] ${className}`}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+    </svg>
+);
+
 export const SettingsIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
@@ -113,5 +120,28 @@ export const FavoriteFoodIcon: React.FC<{className?: string}> = ({className}) =>
         <path d="M22 9h-1.5"/>
         <path d="M14 5.5V3h-4v2.5"/>
         <path d="M12 9a2.5 2.5 0 0 0-2.5 2.5V13h5v-1.5A2.5 2.5 0 0 0 12 9z"/>
+    </svg>
+);
+
+export const ExportIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+);
+
+export const ImportIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+);
+
+export const ProfileIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
     </svg>
 );

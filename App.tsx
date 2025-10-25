@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile } from './types';
-import { getBestiesResponse, getSingleBestieResponse } from './services/geminiService';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData } from './types';
+import { getBestiesResponse, getSingleBestieResponse, generateDiaryEntry } from './services/geminiService';
 import { PERSONAS, locales } from './constants';
 import Sidebar from './components/Sidebar';
 import ChatList from './components/ChatList';
@@ -9,6 +9,8 @@ import TopBar from './components/TopBar';
 import ContactsView from './components/ContactsView';
 import ProfileCard from './components/ProfileCard';
 import OnboardingModal from './components/OnboardingModal';
+import DiaryView from './components/DiaryView';
+import ProfileModal from './components/ProfileModal';
 
 export const LocalizationContext = React.createContext({
   t: (key: string) => locales.en[key] || key,
@@ -51,13 +53,25 @@ const App: React.FC = () => {
         return null;
       }
   });
+  
+  const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>(() => {
+    try {
+      const savedEntries = localStorage.getItem('diaryEntries');
+      return savedEntries ? JSON.parse(savedEntries) : [];
+    } catch (error) {
+      console.error("Failed to load diary entries from localStorage", error);
+      return [];
+    }
+  });
 
   const [activeChatId, setActiveChatId] = useState<ConversationID>('group');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [theme, setTheme] = useState<Theme>('light');
   const [language, setLanguage] = useState<Language>('zh');
-  const [activeView, setActiveView] = useState<'chats' | 'contacts'>('chats');
+  const [activeView, setActiveView] = useState<'chats' | 'contacts' | 'diary'>('chats');
   const [profileCardPersona, setProfileCardPersona] = useState<PersonaName | null>(null);
+  const [isProfileModalOpen, setProfileModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -80,6 +94,14 @@ const App: React.FC = () => {
         console.error("Failed to save user profile to localStorage", error);
     }
   }, [userProfile]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('diaryEntries', JSON.stringify(diaryEntries));
+    } catch (error) {
+      console.error("Failed to save diary entries to localStorage", error);
+    }
+  }, [diaryEntries]);
 
 
   const t = useCallback((key: string) => {
@@ -158,8 +180,78 @@ const App: React.FC = () => {
     }
   }, [language, userProfile]);
 
+  const handleGenerateDiary = useCallback(async (chatId: ConversationID) => {
+    if (!userProfile) return;
+    const conversation = conversations[chatId];
+    if (!conversation || conversation.messages.length < 2) return;
+    setIsLoading(true);
+    const userMessages = conversation.messages.filter(msg => msg.sender === 'Me');
+    try {
+        const diaryEntry = await generateDiaryEntry(userMessages, language, userProfile);
+        setDiaryEntries(prev => [diaryEntry, ...prev]);
+        setActiveView('diary');
+    } catch (error) {
+        console.error("Failed to generate diary entry:", error);
+    } finally {
+        setIsLoading(false);
+    }
+  }, [conversations, language, userProfile]);
+
   const handleSaveProfile = (profile: UserProfile) => {
     setUserProfile(profile);
+  };
+  
+  const handleExportData = () => {
+    const data: CombinedData = {
+        userProfile,
+        conversations,
+        diaryEntries,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `besties_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportData = () => {
+    fileInputRef.current?.click();
+  };
+
+  const onFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const result = e.target?.result;
+            if (typeof result === 'string') {
+                const data: CombinedData = JSON.parse(result);
+                if (data.userProfile && data.conversations && Array.isArray(data.diaryEntries)) {
+                    setUserProfile(data.userProfile);
+                    setConversations(data.conversations);
+                    setDiaryEntries(data.diaryEntries);
+                    // Reset view to default after import
+                    setActiveChatId('group');
+                    setActiveView('chats');
+                    alert('Data imported successfully!');
+                } else {
+                    throw new Error("Invalid data structure in file.");
+                }
+            }
+        } catch (error) {
+            console.error("Failed to import data:", error);
+            alert("Failed to import data. Please check the file format.");
+        }
+    };
+    reader.readAsText(file);
+    // Reset file input value to allow re-uploading the same file
+    if(event.target) event.target.value = '';
   };
 
   const activeConversation = conversations[activeChatId];
@@ -167,21 +259,53 @@ const App: React.FC = () => {
   if (!userProfile) {
     return <OnboardingModal onSave={handleSaveProfile} />;
   }
+  
+  const renderMainView = () => {
+    switch(activeView) {
+        case 'chats':
+             return activeConversation ? (
+                <ChatWindow
+                  key={activeChatId}
+                  conversation={activeConversation}
+                  onSendMessage={handleSendMessage}
+                  onGenerateDiary={handleGenerateDiary}
+                  isLoading={isLoading}
+                />
+              ) : (
+                 <div className="flex-1 flex items-center justify-center text-center text-[var(--text-color-secondary)]">
+                    <p>Select a chat to start messaging</p>
+                </div>
+              );
+        case 'diary':
+            return <DiaryView entries={diaryEntries} />;
+        default:
+            return <div />; // Should not happen
+    }
+  }
 
   return (
     <LocalizationContext.Provider value={{ t, setLanguage, language }}>
       <div className="flex h-screen bg-[var(--ui-bg)] text-[var(--text-color-primary)] backdrop-blur-xl font-sans">
         
         <div className="flex flex-col flex-shrink-0 w-full md:w-[25rem] lg:w-[28rem] border-r border-[var(--ui-border)]">
-           <TopBar theme={theme} setTheme={setTheme} />
+           <TopBar 
+                theme={theme} 
+                setTheme={setTheme}
+                onExport={handleExportData}
+                onImport={handleImportData}
+                onEditProfile={() => setProfileModalOpen(true)}
+            />
            <div className="flex flex-grow overflow-hidden">
               <Sidebar activeView={activeView} setActiveView={setActiveView} />
               <div className="flex-1 overflow-hidden">
-                {activeView === 'chats' ? (
+                {activeView === 'chats' || activeView === 'diary' ? (
                   <ChatList
                     conversations={Object.values(conversations)}
                     activeChatId={activeChatId}
-                    onSelectChat={setActiveChatId}
+                    onSelectChat={(id) => {
+                        setActiveChatId(id);
+                        setActiveView('chats');
+                    }}
                     onCloseChat={handleCloseChat}
                   />
                 ) : (
@@ -192,18 +316,7 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex-1 flex flex-col">
-          {activeConversation ? (
-            <ChatWindow
-              key={activeChatId}
-              conversation={activeConversation}
-              onSendMessage={handleSendMessage}
-              isLoading={isLoading}
-            />
-          ) : (
-             <div className="flex-1 flex items-center justify-center text-center text-[var(--text-color-secondary)]">
-                <p>Select a chat to start messaging</p>
-            </div>
-          )}
+          {renderMainView()}
         </div>
         
         {profileCardPersona && (
@@ -213,6 +326,17 @@ const App: React.FC = () => {
             onStartChat={startPrivateChat}
           />
         )}
+        {isProfileModalOpen && (
+          <ProfileModal
+            userProfile={userProfile}
+            onSave={(updatedProfile) => {
+                setUserProfile(updatedProfile);
+                setProfileModalOpen(false);
+            }}
+            onClose={() => setProfileModalOpen(false)}
+          />
+        )}
+        <input type="file" accept=".json" ref={fileInputRef} onChange={onFileImport} style={{ display: 'none' }} />
       </div>
     </LocalizationContext.Provider>
   );

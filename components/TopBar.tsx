@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { SettingsIcon, UserIcon } from './Icons';
 import SettingsMenu from './SettingsMenu';
 import type { Theme } from '../types';
@@ -6,9 +6,12 @@ import type { Theme } from '../types';
 interface TopBarProps {
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  onExport: () => void;
+  onImport: () => void;
+  onEditProfile: () => void;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ theme, setTheme }) => {
+const TopBar: React.FC<TopBarProps> = ({ theme, setTheme, onExport, onImport, onEditProfile }) => {
     const [showSettings, setShowSettings] = useState(false);
     const settingsRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +42,16 @@ const TopBar: React.FC<TopBarProps> = ({ theme, setTheme }) => {
                 >
                     <SettingsIcon />
                 </button>
-                {showSettings && <SettingsMenu theme={theme} setTheme={setTheme} onClose={() => setShowSettings(false)} />}
+                {showSettings && (
+                    <SettingsMenu 
+                        theme={theme} 
+                        setTheme={setTheme} 
+                        onClose={() => setShowSettings(false)}
+                        onExport={onExport}
+                        onImport={onImport}
+                        onEditProfile={onEditProfile}
+                    />
+                )}
             </div>
         </div>
     );

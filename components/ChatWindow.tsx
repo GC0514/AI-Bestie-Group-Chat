@@ -2,15 +2,16 @@ import React, { useRef, useEffect } from 'react';
 import type { Conversation, ConversationID } from '../types';
 import Header from './Header';
 import ChatBubble from './ChatBubble';
-import MessageInput from './MessageInput';
+import ChatInputZone from './ChatInputZone';
 
 interface ChatWindowProps {
   conversation: Conversation;
   onSendMessage: (text: string, chatId: ConversationID) => void;
+  onGenerateDiary: (chatId: ConversationID) => void;
   isLoading: boolean;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, isLoading }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, onGenerateDiary, isLoading }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,6 +22,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, is
   
   const handleSend = (text: string) => {
       onSendMessage(text, conversation.id);
+  }
+
+  const handleGenerateDiary = () => {
+    onGenerateDiary(conversation.id);
   }
 
   return (
@@ -45,7 +50,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, is
             </div>
         )}
       </div>
-      <MessageInput onSendMessage={handleSend} isLoading={isLoading} />
+      <ChatInputZone 
+        onSendMessage={handleSend} 
+        onGenerateDiary={handleGenerateDiary}
+        isLoading={isLoading} 
+      />
     </div>
   );
 };

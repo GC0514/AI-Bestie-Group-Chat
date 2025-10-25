@@ -124,13 +124,35 @@ export const PERSONAS: Record<PersonaName, Persona> = {
   }
 };
 
+export const MBTI_DESCRIPTIONS: Record<string, string> = {
+    "INTJ": "富有想象力和战略性的思想家",
+    "INTP": "富有创造力的发明家，对知识充满渴望",
+    "ENTJ": "大胆、富有想象力且意志强大的领导者",
+    "ENTP": "聪明、好奇的思想家，挑战智慧",
+    "INFJ": "安静、神秘，但鼓舞人心且不知疲倦的理想主义者",
+    "INFP": "诗意、善良、利他的人，总能找到美好",
+    "ENFJ": "富有魅力、鼓舞人心的领导者",
+    "ENFP": "热情、富有创造力、善于交际的自由精神",
+    "ISTJ": "务实、注重事实的个体",
+    "ISFJ": "非常专注、热情的守护者",
+    "ESTJ": "出色的管理者，在管理事务或人员方面无与伦比",
+    "ESFJ": "极富同情心、善于交际、受欢迎的人",
+    "ISTP": "大胆、务实的实验家",
+    "ISFP": "灵活、迷人的艺术家",
+    "ESTP": "聪明、精力充沛、感知力强的社交者",
+    "ESFP": "自发、精力充沛、热情的表演者"
+};
+
+
 export const locales: Record<Language, LocaleStrings> = {
     en: {
         chats: 'Chats',
         contacts: 'Besties',
+        diary: 'My Diary',
         groupChat: '闺蜜团 (Group Chat)',
         saySomething: 'Say something...',
         sendMessage: 'Send Message',
+        generateDiary: 'Generate Diary',
         closeChat: 'Close Chat with',
         openEmojiPicker: 'Open emoji picker',
         theme: 'Theme',
@@ -145,14 +167,25 @@ export const locales: Record<Language, LocaleStrings> = {
         mbti: 'MBTI',
         hobbies: 'Hobbies',
         motto: 'Motto',
-        favoriteFood: 'Favorite Food'
+        favoriteFood: 'Favorite Food',
+        myDiary: "My Diary",
+        noDiaryEntries: "You haven't generated any diary entries yet. Chat with your besties and click the 'Generate Diary' button to create your first memory!",
+        generating: "Generating...",
+        dataManagement: "Data Management",
+        exportData: "Export Data",
+        importData: "Import Data",
+        profile: "Profile",
+        editProfile: "Edit Profile",
+        save: "Save",
     },
     zh: {
         chats: '聊天',
         contacts: '闺蜜团',
+        diary: '我的日记',
         groupChat: '闺蜜团 (群聊)',
         saySomething: '说点什么吧...',
         sendMessage: '发送消息',
+        generateDiary: '生成日记',
         closeChat: '关闭与...的聊天',
         openEmojiPicker: '打开表情选择器',
         theme: '主题',
@@ -167,7 +200,16 @@ export const locales: Record<Language, LocaleStrings> = {
         mbti: 'MBTI',
         hobbies: '爱好',
         motto: '座右铭',
-        favoriteFood: '喜欢的美食'
+        favoriteFood: '喜欢的美食',
+        myDiary: "我的日记",
+        noDiaryEntries: "你还没有生成任何日记哦。和闺蜜们聊聊天，然后点击“生成日记”按钮，创造你们的第一份专属回忆吧！",
+        generating: "生成中...",
+        dataManagement: "数据管理",
+        exportData: "导出数据",
+        importData: "导入数据",
+        profile: "个人档案",
+        editProfile: "编辑档案",
+        save: "保存",
     }
 }
 
@@ -179,6 +221,22 @@ const personaDetailsForPromptEN = Object.values(PERSONAS).map(p =>
   `- ${p.name} (${p.description}): ${p.detailedDescription} Occupation: ${p.occupation}. MBTI is ${p.mbti}. Motto is ${p.quote}.`
 ).join('\n');
 
+const userProfileForPrompt = (userProfile: UserProfile, lang: Language) => {
+    if (lang === 'zh') {
+        return `- **昵称:** ${userProfile.nickname}
+- **关于我:** ${userProfile.description}
+- **星座:** ${userProfile.zodiac || '未设置'}
+- **MBTI:** ${userProfile.mbti || '未设置'}
+- **标签:** ${userProfile.tags.join(', ') || '未设置'}
+- **注意:** 一定要用用户的昵称来称呼她。记住这些细节，让对话更个人化。你们是多年的老朋友了。`;
+    }
+    return `- **Nickname:** ${userProfile.nickname}
+- **About:** ${userProfile.description}
+- **Zodiac:** ${userProfile.zodiac || 'Not set'}
+- **MBTI:** ${userProfile.mbti || 'Not set'}
+- **Tags:** ${userProfile.tags.join(', ') || 'Not set'}
+- **Note:** Always address the user by their nickname. Remember their details to make the conversation personal. You are old friends.`;
+}
 
 export const getSystemPromptGroup = (lang: Language, userProfile: UserProfile) => {
     if (lang === 'zh') {
@@ -187,9 +245,7 @@ export const getSystemPromptGroup = (lang: Language, userProfile: UserProfile) =
 你是一个多角色AI系统，在一个名为“闺蜜团”的聊天应用中管理8个AI闺蜜。你的首要目标是为人类用户“Me”提供积极的情感支持。你必须根据用户的消息分析其情绪状态，并协调所有AI角色的回应。每个角色的每一次回应都必须是积极、支持性的，并且完全符合其人设。对于有特定职业的角色，她们的发言需要体现出相应的专业知识和背景。
 
 # USER PROFILE (Your Best Friend)
-- **Nickname:** ${userProfile.nickname}
-- **About:** ${userProfile.description}
-- **Note:** Always address the user by their nickname. Remember their details to make the conversation personal. You are old friends.
+${userProfileForPrompt(userProfile, lang)}
 
 # AI PERSONA ROSTER (必须为每个角色生成回应)
 ${personaDetailsForPrompt}
@@ -220,9 +276,7 @@ ${personaDetailsForPrompt}
 You are a multi-persona AI system managing a group of 8 AI best friends ("闺蜜团") in a chat application. Your primary goal is to provide positive emotional support to the human user, "Me". You must detect the user's emotional state from their message and coordinate the responses of all AI personas accordingly. Every response must be positive, supportive, and in character. For personas with specific professions, their dialogue must reflect relevant knowledge and background.
 
 # USER PROFILE (Your Best Friend)
-- **Nickname:** ${userProfile.nickname}
-- **About:** ${userProfile.description}
-- **Note:** Always address the user by their nickname. Remember their details to make the conversation personal. You are old friends.
+${userProfileForPrompt(userProfile, lang)}
 
 # AI PERSONA ROSTER (You must generate a response for EACH of them in EVERY turn)
 ${personaDetailsForPromptEN}
@@ -254,9 +308,7 @@ export const getSystemPromptSingle = (personaName: PersonaName, lang: Language, 
 你正在扮演一个名为“闺蜜团”的AI伴侣应用中的一个特定角色。你的名字是 ${p.name}。你正在和你的好朋友，也就是人类用户“Me”，进行一对一的私聊。你的目标是作为 ${p.name}，完全沉浸在角色中，为用户提供积极、支持性的陪伴。
 
 # USER PROFILE (Your Best Friend)
-- **Nickname:** ${userProfile.nickname}
-- **About:** ${userProfile.description}
-- **Note:** Always address the user by their nickname, ${userProfile.nickname}. Remember their details to make the conversation personal. You are old friends.
+${userProfileForPrompt(userProfile, lang)}
 
 # YOUR PERSONA
 - **名字:** ${p.name}
@@ -281,9 +333,7 @@ export const getSystemPromptSingle = (personaName: PersonaName, lang: Language, 
 You are playing a specific character named ${p.name} within an AI companion app called "闺蜜团". You are in a one-on-one private chat with your good friend, the human user "Me". Your goal is to be a positive, supportive companion, fully in character as ${p.name}.
 
 # USER PROFILE (Your Best Friend)
-- **Nickname:** ${userProfile.nickname}
-- **About:** ${userProfile.description}
-- **Note:** Always address the user by their nickname, ${userProfile.nickname}. Remember their details to make the conversation personal. You are old friends.
+${userProfileForPrompt(userProfile, lang)}
 
 # YOUR PERSONA
 - **Name:** ${p.name}
@@ -301,4 +351,44 @@ You are playing a specific character named ${p.name} within an AI companion app 
 4. **Crisis Intervention:** If the user mentions any thoughts of self-harm or suicide, your absolute priority is to express immediate, deep concern and strongly guide them towards professional help, providing contact information for crisis hotlines.
 5. **Output Format:** Your entire output must be a single, valid JSON object. This object must have two keys: "sender" (your name, which must be "${p.name}") and "text" (your message to the user). Do not include any extra explanations.
 `;
-}
+};
+
+
+export const getSystemPromptDiary = (lang: Language, userProfile: UserProfile) => {
+    if (lang === 'zh') {
+        return `
+# ROLE & GOAL
+你是一位拥有深厚文字功底、情感细腻的日记记录者。你的任务是阅读以下用户（昵称: ${userProfile.nickname}）的聊天片段，并将其提炼、升华成一篇优美、流畅、充满真情实感的日记。
+
+# GUIDELINES
+1.  **聚焦用户:** 你的日记内容必须完全基于用户自己的发言。**绝对不要**提及任何AI闺蜜或聊天本身。这篇日记是用户的内心独白。
+2.  **文笔优美:** 使用比喻、排比等修辞手法，将用户零散的语言片段整合成一篇结构完整、情感饱满的散文或随笔。你的文字应该充满温度和洞察力。
+3.  **提炼主题:** 从用户的发言中捕捉核心情绪和主题（例如：一天的疲惫、一次小小的胜利、对未来的迷茫或期盼等）。
+4.  **创造标题:** 为这篇日记起一个贴切、具有文学感的标题。
+5.  **第一人称视角:** 整篇日记必须使用第一人称“我”来书写，仿佛是用户自己在记录。
+
+# OUTPUT FORMAT
+你的整个输出必须是一个有效的JSON对象，包含三个键:
+- "date": "YYYY-MM-DD" (今天的日期)
+- "title": "你的日记标题" (String)
+- "content": "你的日记正文" (String, 使用 \\n 进行换行)
+`;
+    }
+    return `
+# ROLE & GOAL
+You are a sophisticated and empathetic diarist with a strong literary flair. Your task is to read the following chat excerpts from the user (nickname: ${userProfile.nickname}) and transform them into a beautiful, flowing, and emotionally resonant diary entry.
+
+# GUIDELINES
+1.  **Focus on the User:** Your diary entry must be based exclusively on the user's own messages. **Do NOT** mention any AI besties or the chat itself. This diary is the user's inner monologue.
+2.  **Elegant Prose:** Use literary devices to synthesize the user's fragmented messages into a well-structured, emotionally rich piece of writing. Your words should be warm and insightful.
+3.  **Distill the Theme:** Identify the core emotion and theme from the user's messages (e.g., the weariness of a long day, a small victory, confusion or hope about the future).
+4.  **Create a Title:** Give the diary entry a fitting and evocative title.
+5.  **First-Person Perspective:** The entire entry must be written in the first person ("I"), as if the user is writing it themselves.
+
+# OUTPUT FORMAT
+Your entire output must be a single, valid JSON object with three keys:
+- "date": "YYYY-MM-DD" (Today's date)
+- "title": "Your Diary Title" (String)
+- "content": "Your diary content" (String, use \\n for newlines)
+`;
+};

@@ -1,10 +1,10 @@
 import React, { useContext } from 'react';
-import { ChatIcon, ContactsIcon } from './Icons';
+import { ChatIcon, ContactsIcon, DiaryIcon } from './Icons';
 import { LocalizationContext } from '../App';
 
 interface SidebarProps {
-  activeView: 'chats' | 'contacts';
-  setActiveView: (view: 'chats' | 'contacts') => void;
+  activeView: 'chats' | 'contacts' | 'diary';
+  setActiveView: (view: 'chats' | 'contacts' | 'diary') => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
@@ -30,6 +30,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
                 >
                     <ContactsIcon isActive={activeView === 'contacts'} />
                     <span>{t('contacts')}</span>
+                </button>
+                 <button 
+                    onClick={() => setActiveView('diary')} 
+                    title={t('diary')} 
+                    aria-label={t('diary')}
+                    className="flex flex-col items-center space-y-1 text-xs text-[var(--text-color-secondary)] hover:text-violet-400 transition-colors"
+                >
+                    <DiaryIcon isActive={activeView === 'diary'} />
+                    <span>{t('diary')}</span>
                 </button>
             </div>
         </div>

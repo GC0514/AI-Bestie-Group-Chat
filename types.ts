@@ -42,4 +42,19 @@ export type LocaleStrings = {
 export interface UserProfile {
   nickname: string;
   description: string;
+  zodiac: string;
+  mbti: string;
+  tags: string[];
+}
+
+export interface DiaryEntry {
+    date: string;
+    title: string;
+    content: string;
+}
+
+export interface CombinedData {
+    userProfile: UserProfile | null;
+    conversations: Partial<Record<ConversationID, Conversation>>;
+    diaryEntries: DiaryEntry[];
 }
