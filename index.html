@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Bestie Group Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
+          "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+          "react": "https://aistudiocdn.com/react@^19.2.0",
+          "react/": "https://aistudiocdn.com/react@^19.2.0/"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        --bg-color-from: #020420;
+        --bg-color-via: #0f172a;
+        --bg-color-to: #1e1b4b;
+        --text-color-primary: #e2e8f0;
+        --text-color-secondary: #94a3b8;
+        --ui-bg: rgba(15, 23, 42, 0.8);
+        --ui-border: rgba(255, 255, 255, 0.1);
+        --ui-panel-bg: rgba(2, 6, 23, 0.3);
+      }
+
+      html[data-theme='light'] {
+        --bg-color-from: #f3e8ff;
+        --bg-color-via: #fce7f3;
+        --bg-color-to: #e0f2fe;
+        --text-color-primary: #1e293b;
+        --text-color-secondary: #475569;
+        --ui-bg: rgba(255, 255, 255, 0.7);
+        --ui-border: rgba(0, 0, 0, 0.1);
+        --ui-panel-bg: rgba(241, 245, 249, 0.5);
+      }
+      
+      body {
+          background-image: linear-gradient(to bottom right, var(--bg-color-from), var(--bg-color-via), var(--bg-color-to));
+          color: var(--text-color-primary);
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+    <div id="root" class="h-screen"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,40 @@
+export type PersonaName = '苏默' | '元气小桃' | '林溪' | '江晚' | '星野' | '楚菲' | '顾盼' | '哈哈酱';
+
+export type UserOrSystem = 'Me' | 'System';
+
+export interface ChatMessage {
+  sender: PersonaName | UserOrSystem;
+  text: string;
+}
+
+export interface Persona {
+  name: PersonaName;
+  color: string;
+  description: string;
+  age: number;
+  detailedDescription: string;
+  avatar: string; // URL to an image
+  tags: string[];
+  zodiac: string;
+  mbti: string;
+  quote: string;
+  occupation: string;
+  hobbies: string[];
+  favoriteFood: string;
+}
+
+export type ConversationID = PersonaName | 'group';
+
+export interface Conversation {
+    id: ConversationID;
+    name: string;
+    messages: ChatMessage[];
+    isGroup: boolean;
+}
+
+export type Theme = 'light' | 'dark';
+export type Language = 'en' | 'zh';
+
+export type LocaleStrings = {
+    [key: string]: string;
+};
