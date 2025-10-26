@@ -1,3 +1,4 @@
+
 import React, { useContext } from 'react';
 import type { DiaryEntry } from '../types';
 import { LocalizationContext } from '../App';
@@ -5,9 +6,10 @@ import { DiaryIcon } from './Icons';
 
 interface DiaryViewProps {
   entries: DiaryEntry[];
+  onRegenerate: (entry: DiaryEntry) => void;
 }
 
-const DiaryView: React.FC<DiaryViewProps> = ({ entries }) => {
+const DiaryView: React.FC<DiaryViewProps> = ({ entries, onRegenerate }) => {
     const { t } = useContext(LocalizationContext);
     
     return (
@@ -31,9 +33,17 @@ const DiaryView: React.FC<DiaryViewProps> = ({ entries }) => {
                     <div className="space-y-8 max-w-3xl mx-auto">
                         {entries.map((entry, index) => (
                             <article key={index} className="bg-[var(--ui-panel-bg)] p-6 rounded-lg shadow-lg border border-[var(--ui-border)]">
-                                <header className="mb-4 pb-3 border-b border-[var(--ui-border)]">
-                                    <h2 className="text-2xl font-bold text-[var(--text-color-primary)]">{entry.title}</h2>
-                                    <time className="text-sm text-[var(--text-color-secondary)] mt-1">{entry.date}</time>
+                                <header className="mb-4 pb-3 border-b border-[var(--ui-border)] flex justify-between items-start">
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-[var(--text-color-primary)]">{entry.title}</h2>
+                                        <time className="text-sm text-[var(--text-color-secondary)] mt-1">{entry.date}</time>
+                                    </div>
+                                    <button 
+                                        onClick={() => onRegenerate(entry)}
+                                        className="text-sm text-violet-400 hover:text-violet-300 transition-colors px-3 py-1 rounded-md border border-violet-400/50 hover:bg-violet-400/10"
+                                    >
+                                        {t('regenerate')}
+                                    </button>
                                 </header>
                                 <div className="prose prose-invert max-w-none text-[var(--text-color-secondary)] leading-relaxed whitespace-pre-wrap">
                                     <p className="text-[var(--text-color-primary)]">{entry.content}</p>

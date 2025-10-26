@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData, PersonaInterests } from './types';
-import { getBestiesResponse, getSingleBestieResponse, generateDiaryEntry, getProactiveGreeting, extractMemories } from './services/geminiService';
+import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData, PersonaInterests, RegenerationSource } from './types';
+import { getBestiesResponse, getSingleBestieResponse, generateDiaryEntry as generateDiaryEntryService, getProactiveGreeting, extractMemories } from './services/geminiService';
 import { PERSONA_INTEREST_MAP } from './data/interests';
 import { PERSONAS } from './data/personas';
 import { locales } from './data/locales';
@@ -14,6 +14,7 @@ import ProfileCard from './components/ProfileCard';
 import OnboardingModal from './components/OnboardingModal';
 import DiaryView from './components/DiaryView';
 import ProfileModal from './components/ProfileModal';
+import RegenerateDiaryModal from './components/RegenerateDiaryModal';
 
 export const LocalizationContext = React.createContext({
   t: (key: string) => locales.en[key] || key,
@@ -23,10 +24,9 @@ export const LocalizationContext = React.createContext({
 
 // Helper to simulate typing delay
 const calculateTypingDelay = (text: string): number => {
-    const baseDelay = 500; // Minimum delay in ms
-    const perCharDelay = 35; // ms per character
-    const randomFactor = Math.random() * 500; // Add some randomness
-    return baseDelay + (text.length * perCharDelay) + randomFactor;
+    const baseDelay = 300; // Minimum delay
+    const perCharDelay = 40; // ms per character
+    return baseDelay + (text.length * perCharDelay);
 };
 
 // Utility to update persona interests based on user's key memories
@@ -68,7 +68,6 @@ const App: React.FC = () => {
       const savedConvos = localStorage.getItem('conversations');
       if (savedConvos) {
           const loadedConvos = JSON.parse(savedConvos);
-          // FORTIFIED LOADING: Ensure the essential group chat exists. If not, add it.
           if (!loadedConvos.group) {
               loadedConvos.group = defaultState.group;
           }
@@ -116,10 +115,11 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'chats' | 'contacts' | 'diary'>('chats');
   const [profileCardPersona, setProfileCardPersona] = useState<PersonaName | null>(null);
   const [isProfileModalOpen, setProfileModalOpen] = useState(false);
+  const [isRegenerateModalOpen, setRegenerateModalOpen] = useState(false);
+  const [diaryToRegenerate, setDiaryToRegenerate] = useState<DiaryEntry | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Effect to update persona interests when user memories change
   useEffect(() => {
     if (userProfile?.keyMemories) {
         const newInterests = updatePersonaInterests(userProfile.keyMemories);
@@ -135,7 +135,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Cleanup timeout on component unmount
   useEffect(() => {
       return () => {
           clearLoadingTimeout();
@@ -173,7 +172,6 @@ const App: React.FC = () => {
   }, [diaryEntries]);
 
 
-  // Proactive Care feature effect
   useEffect(() => {
     const handleProactiveGreeting = async () => {
         if (!userProfile || !conversations.group) return;
@@ -207,12 +205,11 @@ const App: React.FC = () => {
               return;
             }
             
-            let maxDelay = 0;
+            let cumulativeDelay = 0;
             greetings.forEach((greeting) => {
-                const delay = calculateTypingDelay(greeting.text) + Math.random() * 1000; // Add extra randomness
-                if (delay > maxDelay) {
-                    maxDelay = delay;
-                }
+                const thinkingPause = Math.random() * 1500 + 500; // 0.5 to 2 sec pause
+                cumulativeDelay += thinkingPause;
+
                 setTimeout(() => {
                     setConversations(prev => {
                         const groupChat = prev.group;
@@ -222,10 +219,12 @@ const App: React.FC = () => {
                             group: { ...groupChat, messages: [...groupChat.messages, { ...greeting, timestamp: Date.now() }] }
                         };
                     });
-                }, delay);
+                }, cumulativeDelay);
+                
+                cumulativeDelay += calculateTypingDelay(greeting.text);
             });
             
-            setTimeout(() => setIsLoading(false), maxDelay);
+            setTimeout(() => setIsLoading(false), cumulativeDelay);
 
         } catch (e) {
             console.error("Failed to get proactive greeting:", e);
@@ -306,7 +305,7 @@ const App: React.FC = () => {
             ...prev,
             [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, errorMessage] }
         }));
-    }, 35000); // 35-second watchdog
+    }, 35000);
 
     extractMemories(text, language).then(newMemories => {
         if (Object.keys(newMemories).length > 0) {
@@ -323,26 +322,29 @@ const App: React.FC = () => {
     try {
       if (chatId === 'group') {
         const aiResponses = await getBestiesResponse(text, language, userProfile, personaInterests);
-        let maxDelay = 0;
+        
+        let cumulativeDelay = 0;
         aiResponses.forEach((res) => {
-          // Each response gets its own randomized delay, not cumulative
-          const delay = calculateTypingDelay(res.text) + Math.random() * 1500;
-          if (delay > maxDelay) {
-            maxDelay = delay;
-          }
+          // Add a random "thinking" pause before each message
+          const thinkingPause = Math.random() * 1500 + 500; // 0.5 to 2 seconds pause
+          cumulativeDelay += thinkingPause;
+
+          // Schedule the message to appear after the cumulative delay
           setTimeout(() => {
             setConversations(prev => ({
               ...prev,
               [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, { ...res, timestamp: Date.now() }] }
             }));
-          }, delay);
+          }, cumulativeDelay);
+
+          // Add the message's own "typing" duration to the delay for the *next* message
+          cumulativeDelay += calculateTypingDelay(res.text); 
         });
 
-        // Set loading to false after the longest delay has passed
         setTimeout(() => {
             clearLoadingTimeout();
             setIsLoading(false)
-        }, maxDelay);
+        }, cumulativeDelay);
 
       } else {
         const personaName = chatId as PersonaName;
@@ -376,11 +378,19 @@ const App: React.FC = () => {
     if (!userProfile) return;
     const conversation = conversations[chatId];
     if (!conversation || conversation.messages.length < 2) return;
+
     setIsLoading(true);
     const userMessages = conversation.messages.filter(msg => msg.sender === 'Me');
+
     try {
-        const diaryEntry = await generateDiaryEntry(userMessages, language, userProfile);
-        setDiaryEntries(prev => [diaryEntry, ...prev]);
+        const { title, content } = await generateDiaryEntryService(userMessages, language, userProfile);
+        const newEntry: DiaryEntry = {
+            date: new Date().toISOString().split('T')[0],
+            title,
+            content,
+            sourceChatId: chatId, // Store the source of the diary entry
+        };
+        setDiaryEntries(prev => [newEntry, ...prev]);
         setActiveView('diary');
     } catch (error) {
         console.error("Failed to generate diary entry:", error);
@@ -388,6 +398,45 @@ const App: React.FC = () => {
         setIsLoading(false);
     }
   }, [conversations, language, userProfile]);
+  
+  const handleRegenerateDiary = useCallback(async (entryToRegen: DiaryEntry, source: RegenerationSource) => {
+    if (!userProfile) return;
+    setRegenerateModalOpen(false);
+    setIsLoading(true);
+
+    let messagesToProcess: ChatMessage[] = [];
+    if (source === 'original' && entryToRegen.sourceChatId) {
+        messagesToProcess = conversations[entryToRegen.sourceChatId]?.messages.filter(m => m.sender === 'Me') || [];
+    } else if (source === 'group') {
+        messagesToProcess = conversations.group?.messages.filter(m => m.sender === 'Me') || [];
+    } else if (source === 'all') {
+        Object.values(conversations).forEach(convo => {
+            if (convo) {
+                messagesToProcess.push(...convo.messages.filter(m => m.sender === 'Me'));
+            }
+        });
+    }
+
+    if (messagesToProcess.length === 0) {
+        console.warn("No user messages found for regeneration source:", source);
+        setIsLoading(false);
+        return;
+    }
+
+    try {
+        const { title, content } = await generateDiaryEntryService(messagesToProcess, language, userProfile);
+        setDiaryEntries(prev => prev.map(entry => 
+            entry.date === entryToRegen.date && entry.title === entryToRegen.title
+            ? { ...entry, title, content } // Update content and title, keep original date and source
+            : entry
+        ));
+    } catch (error) {
+        console.error("Failed to regenerate diary entry:", error);
+    } finally {
+        setIsLoading(false);
+    }
+  }, [userProfile, language, conversations]);
+
 
   const handleSaveProfile = (profile: UserProfile) => {
     setUserProfile(profile);
@@ -430,7 +479,6 @@ const App: React.FC = () => {
                     }
 
                     const importedConversations = data.conversations;
-                    // Ensure group chat exists after import to prevent crashes
                     if (!importedConversations.group) {
                         importedConversations.group = {
                             id: 'group',
@@ -458,6 +506,12 @@ const App: React.FC = () => {
     reader.readAsText(file);
     if(event.target) event.target.value = '';
   };
+  
+  const openRegenerateModal = (entry: DiaryEntry) => {
+    setDiaryToRegenerate(entry);
+    setRegenerateModalOpen(true);
+  };
+
 
   const activeConversation = conversations[activeChatId];
 
@@ -482,7 +536,7 @@ const App: React.FC = () => {
                 </div>
               );
         case 'diary':
-            return <DiaryView entries={diaryEntries} />;
+            return <DiaryView entries={diaryEntries} onRegenerate={openRegenerateModal} />;
         default:
             return <div />;
     }
@@ -540,6 +594,13 @@ const App: React.FC = () => {
             }}
             onClose={() => setProfileModalOpen(false)}
           />
+        )}
+        {isRegenerateModalOpen && diaryToRegenerate && (
+            <RegenerateDiaryModal
+                entry={diaryToRegenerate}
+                onClose={() => setRegenerateModalOpen(false)}
+                onRegenerate={handleRegenerateDiary}
+            />
         )}
         <input type="file" accept=".json" ref={fileInputRef} onChange={onFileImport} style={{ display: 'none' }} />
       </div>

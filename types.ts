@@ -1,3 +1,4 @@
+
 export type PersonaName = '苏默' | '元气小桃' | '林溪' | '江晚' | '星野' | '楚菲' | '顾盼' | '哈哈酱';
 
 export type UserOrSystem = 'Me' | 'System';
@@ -53,6 +54,7 @@ export interface DiaryEntry {
     date: string;
     title: string;
     content: string;
+    sourceChatId?: ConversationID; // To know where the diary came from
 }
 
 export interface CombinedData {
@@ -68,3 +70,5 @@ export interface ProactiveContext {
 }
 
 export type PersonaInterests = Partial<Record<PersonaName, string[]>>;
+
+export type RegenerationSource = 'original' | 'group' | 'all';

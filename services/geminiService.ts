@@ -48,11 +48,10 @@ const singleResponseSchema = {
 const diaryResponseSchema = {
     type: Type.OBJECT,
     properties: {
-        date: { type: Type.STRING },
         title: { type: Type.STRING },
         content: { type: Type.STRING },
     },
-    required: ["date", "title", "content"],
+    required: ["title", "content"],
 };
 
 const memoryExtractionSchema = {
@@ -162,7 +161,7 @@ export async function getSingleBestieResponse(userMessage: string, personaName: 
     }
 }
 
-export async function generateDiaryEntry(userMessages: ChatMessage[], lang: Language, userProfile: UserProfile): Promise<DiaryEntry> {
+export async function generateDiaryEntry(userMessages: ChatMessage[], lang: Language, userProfile: UserProfile): Promise<Omit<DiaryEntry, 'date' | 'sourceChatId'>> {
     try {
         const userChatHistory = userMessages.map(msg => msg.text).join('\n');
         const prompt = `Here are the user's recent thoughts:\n---\n${userChatHistory}\n---\nBased on these, please write a diary entry.`;
@@ -180,8 +179,8 @@ export async function generateDiaryEntry(userMessages: ChatMessage[], lang: Lang
         const jsonText = response.text.trim();
         const parsedResponse = JSON.parse(jsonText);
 
-        if (parsedResponse && parsedResponse.date && parsedResponse.title && parsedResponse.content) {
-            return parsedResponse as DiaryEntry;
+        if (parsedResponse && parsedResponse.title && parsedResponse.content) {
+            return parsedResponse as Omit<DiaryEntry, 'date' | 'sourceChatId'>;
         } else {
             throw new Error("Invalid diary format from API.");
         }

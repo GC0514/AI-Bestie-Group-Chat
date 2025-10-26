@@ -33,6 +33,14 @@ export const locales: Record<Language, LocaleStrings> = {
         profile: "Profile",
         editProfile: "Edit Profile",
         save: "Save",
+        regenerate: 'Regenerate',
+        regenerateDiaryPrompt: 'Choose a new source to regenerate this diary entry. The content will be replaced.',
+        regenerateFromOriginal: 'From Original Source',
+        regenerateFromOriginalDesc: 'Use only the conversation this entry was originally created from.',
+        regenerateFromGroup: 'From Group Chat',
+        regenerateFromGroupDesc: 'Use only the conversation from the main group chat.',
+        regenerateFromAll: 'From All Conversations',
+        regenerateFromAllDesc: 'Use all of your conversations from the day for a broader summary.',
     },
     zh: {
         chats: '聊天',
@@ -66,5 +74,13 @@ export const locales: Record<Language, LocaleStrings> = {
         profile: "个人档案",
         editProfile: "编辑档案",
         save: "保存",
+        regenerate: '重新生成',
+        regenerateDiaryPrompt: '请选择一个新的聊天记录来源来重新生成这篇日记。原有内容将被覆盖。',
+        regenerateFromOriginal: '从原始记录生成',
+        regenerateFromOriginalDesc: '仅使用最初生成这篇日记时的聊天记录。',
+        regenerateFromGroup: '从群聊记录生成',
+        regenerateFromGroupDesc: '仅使用“闺蜜团”群聊的聊天记录。',
+        regenerateFromAll: '从所有对话生成',
+        regenerateFromAllDesc: '融合今天所有的聊天记录，生成更全面的总结。',
     }
 }
