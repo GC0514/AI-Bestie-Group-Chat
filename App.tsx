@@ -167,7 +167,7 @@ const AppContent: React.FC = () => {
     try {
       localStorage.setItem('diaryEntries', JSON.stringify(diaryEntries));
     } catch (error) {
-      console.error("Failed to save diary entries from localStorage", error);
+      console.error("Failed to save diary entries to localStorage", error);
     }
   }, [diaryEntries]);
 
@@ -532,70 +532,71 @@ const AppContent: React.FC = () => {
     }
   }
 
-  if (!userProfile) {
-    return <OnboardingModal onSave={handleSaveProfile} />;
-  }
-
   return (
-    <div className="flex h-screen bg-[var(--ui-bg)] text-[var(--text-color-primary)] backdrop-blur-xl font-sans">
-      <div className="flex flex-col flex-shrink-0 w-full md:w-[25rem] lg:w-[28rem] border-r border-[var(--ui-border)]">
-        <TopBar 
-              theme={theme} 
-              setTheme={setTheme}
-              onExport={handleExportData}
-              onImport={handleImportData}
-              onEditProfile={() => setProfileModalOpen(true)}
-          />
-        <div className="flex flex-grow overflow-hidden">
-            <Sidebar activeView={activeView} setActiveView={setActiveView} />
-            <div className="flex-1 overflow-hidden">
-              {activeView === 'chats' || activeView === 'diary' ? (
-                <ChatList
-                  conversations={Object.values(conversations)}
-                  activeChatId={activeChatId}
-                  onSelectChat={(id) => {
-                      setActiveChatId(id);
-                      setActiveView('chats');
-                  }}
-                  onCloseChat={handleCloseChat}
-                />
-              ) : (
-                <ContactsView onSelectPersona={setProfileCardPersona} />
-              )}
+    <>
+      {!userProfile && <OnboardingModal onSave={handleSaveProfile} />}
+      {userProfile && (
+        <div className="flex h-screen bg-[var(--ui-bg)] text-[var(--text-color-primary)] backdrop-blur-xl font-sans">
+          <div className="flex flex-col flex-shrink-0 w-full md:w-[25rem] lg:w-[28rem] border-r border-[var(--ui-border)]">
+            <TopBar 
+                  theme={theme} 
+                  setTheme={setTheme}
+                  onExport={handleExportData}
+                  onImport={handleImportData}
+                  onEditProfile={() => setProfileModalOpen(true)}
+              />
+            <div className="flex flex-grow overflow-hidden">
+                <Sidebar activeView={activeView} setActiveView={setActiveView} />
+                <div className="flex-1 overflow-hidden">
+                  {activeView === 'chats' || activeView === 'diary' ? (
+                    <ChatList
+                      conversations={Object.values(conversations)}
+                      activeChatId={activeChatId}
+                      onSelectChat={(id) => {
+                          setActiveChatId(id);
+                          setActiveView('chats');
+                      }}
+                      onCloseChat={handleCloseChat}
+                    />
+                  ) : (
+                    <ContactsView onSelectPersona={setProfileCardPersona} />
+                  )}
+                </div>
             </div>
+          </div>
+          
+          <div className="flex-1 flex flex-col">
+            {renderMainView()}
+          </div>
+          
+          {profileCardPersona && (
+            <ProfileCard 
+              persona={PERSONAS[profileCardPersona]} 
+              onClose={() => setProfileCardPersona(null)}
+              onStartChat={startPrivateChat}
+            />
+          )}
+          {isProfileModalOpen && (
+            <ProfileModal
+              userProfile={userProfile}
+              onSave={(updatedProfile) => {
+                  setUserProfile(updatedProfile);
+                  setProfileModalOpen(false);
+              }}
+              onClose={() => setProfileModalOpen(false)}
+            />
+          )}
+          {isRegenerateModalOpen && diaryToRegenerate && (
+              <RegenerateDiaryModal
+                  entry={diaryToRegenerate}
+                  onClose={() => setRegenerateModalOpen(false)}
+                  onRegenerate={handleRegenerateDiary}
+              />
+          )}
+          <input type="file" accept=".json" ref={fileInputRef} onChange={onFileImport} style={{ display: 'none' }} />
         </div>
-      </div>
-      
-      <div className="flex-1 flex flex-col">
-        {renderMainView()}
-      </div>
-      
-      {profileCardPersona && (
-        <ProfileCard 
-          persona={PERSONAS[profileCardPersona]} 
-          onClose={() => setProfileCardPersona(null)}
-          onStartChat={startPrivateChat}
-        />
       )}
-      {isProfileModalOpen && (
-        <ProfileModal
-          userProfile={userProfile}
-          onSave={(updatedProfile) => {
-              setUserProfile(updatedProfile);
-              setProfileModalOpen(false);
-          }}
-          onClose={() => setProfileModalOpen(false)}
-        />
-      )}
-      {isRegenerateModalOpen && diaryToRegenerate && (
-          <RegenerateDiaryModal
-              entry={diaryToRegenerate}
-              onClose={() => setRegenerateModalOpen(false)}
-              onRegenerate={handleRegenerateDiary}
-          />
-      )}
-      <input type="file" accept=".json" ref={fileInputRef} onChange={onFileImport} style={{ display: 'none' }} />
-    </div>
+    </>
   );
 };
 
