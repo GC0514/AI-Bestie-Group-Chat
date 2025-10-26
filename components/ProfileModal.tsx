@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import type { UserProfile } from '../types';
-import { MBTI_DESCRIPTIONS } from '../constants';
+import { MBTI_DESCRIPTIONS } from '../data/personas';
 import { LocalizationContext } from '../App';
 
 interface ProfileModalProps {
@@ -24,6 +24,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ userProfile, onSave, onClos
     e.preventDefault();
     if (nickname.trim() && description.trim()) {
       onSave({ 
+          ...userProfile, // Preserve existing fields like keyMemories
           nickname, 
           description, 
           zodiac, 
@@ -134,7 +135,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ userProfile, onSave, onClos
             }
             @keyframes slide-up {
                 from { transform: translateY(20px) scale(0.98); opacity: 0; }
-                to { transform: translateY(0) scale(1); opacity: 1; }
+                to { transform: translateY(0); opacity: 1; }
             }
             .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
             .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; }

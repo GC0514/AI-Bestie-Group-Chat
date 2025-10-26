@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { UserProfile } from '../types';
-import { MBTI_DESCRIPTIONS } from '../constants';
+import { MBTI_DESCRIPTIONS } from '../data/personas';
 
 interface OnboardingModalProps {
   onSave: (profile: UserProfile) => void;
@@ -25,7 +25,8 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ onSave }) => {
           description, 
           zodiac, 
           mbti, 
-          tags: tags.split(/[,，\s]+/).filter(Boolean) 
+          tags: tags.split(/[,，\s]+/).filter(Boolean),
+          keyMemories: {}, // Initialize empty memories
         });
     }
   };

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ChatMessage, PersonaName } from '../types';
-import { PERSONAS } from '../constants';
+import { PERSONAS } from '../data/personas';
 
 interface ChatBubbleProps {
   message: ChatMessage;

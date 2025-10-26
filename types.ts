@@ -5,6 +5,7 @@ export type UserOrSystem = 'Me' | 'System';
 export interface ChatMessage {
   sender: PersonaName | UserOrSystem;
   text: string;
+  timestamp?: number;
 }
 
 export interface Persona {
@@ -45,6 +46,7 @@ export interface UserProfile {
   zodiac: string;
   mbti: string;
   tags: string[];
+  keyMemories: Record<string, string[]>; // For dynamic memory
 }
 
 export interface DiaryEntry {
@@ -57,4 +59,10 @@ export interface CombinedData {
     userProfile: UserProfile | null;
     conversations: Partial<Record<ConversationID, Conversation>>;
     diaryEntries: DiaryEntry[];
+}
+
+export interface ProactiveContext {
+    recentUserMessages: ChatMessage[];
+    recentDiaryEntry: DiaryEntry | null;
+    userProfile: UserProfile;
 }

@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import type { Conversation, ConversationID, PersonaName } from '../types';
 import { CloseIcon } from './Icons';
-import { PERSONAS } from '../constants';
+import { PERSONAS } from '../data/personas';
 import { LocalizationContext } from '../App';
 
 interface ChatListProps {

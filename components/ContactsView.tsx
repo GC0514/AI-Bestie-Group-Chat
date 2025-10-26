@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { PERSONAS } from '../constants';
+import { PERSONAS } from '../data/personas';
 import type { PersonaName } from '../types';
 import { LocalizationContext } from '../App';
 

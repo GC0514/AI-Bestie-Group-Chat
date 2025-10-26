@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { GroupIcon, UserIcon } from './Icons';
 import { LocalizationContext } from '../App';
 import type { Conversation } from '../types';
-import { PERSONAS } from '../constants';
+import { PERSONAS } from '../data/personas';
 
 interface HeaderProps {
     conversation: Conversation;
