@@ -1,3 +1,4 @@
+
 import type { LocaleStrings, Language } from '../types';
 
 export const locales: Record<Language, LocaleStrings> = {
@@ -18,6 +19,8 @@ export const locales: Record<Language, LocaleStrings> = {
         close: 'Close',
         chat: 'Chat',
         tags: 'Tags',
+        description: 'Description',
+        nickname: 'Nickname',
         occupation: 'Occupation',
         zodiac: 'Zodiac',
         mbti: 'MBTI',
@@ -41,6 +44,19 @@ export const locales: Record<Language, LocaleStrings> = {
         regenerateFromGroupDesc: 'Use only the conversation from the main group chat.',
         regenerateFromAll: 'From All Conversations',
         regenerateFromAllDesc: 'Use all of your conversations from the day for a broader summary.',
+        welcomeTitle: 'Welcome to the Bestie Group!',
+        welcomeSubtitle: "We're so happy to meet you! To help your besties get to know you, please create a simple profile.",
+        nicknamePrompt: 'What should we call you? *',
+        nicknamePlaceholder: 'e.g., Starlight or Ash',
+        tagsPrompt: 'Your personality tags?',
+        tagsPlaceholder: 'Separated by commas, e.g., cat person, coffee lover',
+        zodiacPrompt: 'Your zodiac sign? (Optional)',
+        zodiacPlaceholder: 'Select your sign',
+        mbtiPrompt: 'Your MBTI? (Optional)',
+        mbtiPlaceholder: "Don't know / Don't want to say",
+        descriptionPrompt: 'Could you briefly introduce yourself? *',
+        descriptionPlaceholder: 'e.g., A college student who loves to draw, feeling a bit down lately...',
+        onboardingSubmit: "Say Hi to the Besties!",
     },
     zh: {
         chats: '聊天',
@@ -59,6 +75,8 @@ export const locales: Record<Language, LocaleStrings> = {
         close: '关闭',
         chat: '聊天',
         tags: '标签',
+        description: '个人简介',
+        nickname: '昵称',
         occupation: '职业',
         zodiac: '星座',
         mbti: 'MBTI',
@@ -82,5 +100,18 @@ export const locales: Record<Language, LocaleStrings> = {
         regenerateFromGroupDesc: '仅使用“闺蜜团”群聊的聊天记录。',
         regenerateFromAll: '从所有对话生成',
         regenerateFromAllDesc: '融合今天所有的聊天记录，生成更全面的总结。',
+        welcomeTitle: '欢迎来到闺蜜团！',
+        welcomeSubtitle: '很高兴认识你！为了让你的闺蜜们更好地了解你，请创建一个简单的个人档案吧。',
+        nicknamePrompt: '你的昵称是？ *',
+        nicknamePlaceholder: '比如：小仙女 or 阿伟',
+        tagsPrompt: '你的个性标签？',
+        tagsPlaceholder: '用逗号分开, 如: 猫奴, 咖啡控',
+        zodiacPrompt: '你的星座是？ (可选)',
+        zodiacPlaceholder: '选择你的星座',
+        mbtiPrompt: '你的MBTI是？ (可选)',
+        mbtiPlaceholder: '不确定/不想说',
+        descriptionPrompt: '可以简单介绍一下自己吗？ *',
+        descriptionPlaceholder: '比如：一个爱画画的大学生，最近有点小烦恼...',
+        onboardingSubmit: '和闺蜜们打个招呼！',
     }
 }

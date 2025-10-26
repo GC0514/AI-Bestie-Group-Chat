@@ -2,7 +2,10 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import type { ChatMessage, PersonaName, Language, UserProfile, DiaryEntry, ProactiveContext, PersonaInterests } from '../types';
 import { 
-  getSystemPromptGroup, 
+  getSystemPromptGroupOptimized,
+  personaDetailsForPrompt, 
+  userProfileForPrompt,
+  personaInterestsForPrompt,
   getSystemPromptSingle, 
   getSystemPromptDiary, 
   getSystemPromptProactiveGreeting,
@@ -98,13 +101,21 @@ const memoryExtractionSchema = {
 
 export async function getBestiesResponse(userMessage: string, lang: Language, userProfile: UserProfile, personaInterests: PersonaInterests): Promise<ChatMessage[]> {
   try {
-    const prompt = `The user, ${userProfile.nickname}, says: "${userMessage}". Generate responses from the AI personas based on the new dynamic rules.`;
+    const dynamicContent = `
+# USER PROFILE (Your Best Friend)
+${userProfileForPrompt(userProfile, lang)}
+${personaInterestsForPrompt(personaInterests, userProfile)}
+# AI PERSONA ROSTER (每个角色都有自己的生活和个性)
+${personaDetailsForPrompt}
+# CURRENT CONVERSATION
+The user, ${userProfile.nickname}, says: "${userMessage}". Generate responses from the AI personas based on all the rules and context provided.
+`;
 
     const response = await withTimeout(ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: dynamicContent,
       config: {
-        systemInstruction: getSystemPromptGroup(lang, userProfile, personaInterests),
+        systemInstruction: getSystemPromptGroupOptimized(lang, userProfile),
         responseMimeType: "application/json",
         responseSchema: groupResponseSchema,
       }

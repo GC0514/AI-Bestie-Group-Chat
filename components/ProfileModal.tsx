@@ -1,6 +1,7 @@
+
 import React, { useState, useContext } from 'react';
 import type { UserProfile } from '../types';
-import { MBTI_DESCRIPTIONS } from '../data/personas';
+import { MBTI_DESCRIPTIONS, ZODIAC_SIGNS } from '../data/personas';
 import { LocalizationContext } from '../App';
 
 interface ProfileModalProps {
@@ -9,7 +10,6 @@ interface ProfileModalProps {
   onClose: () => void;
 }
 
-const ZODIAC_SIGNS = ["白羊座", "金牛座", "双子座", "巨蟹座", "狮子座", "处女座", "天秤座", "天蝎座", "射手座", "摩羯座", "水瓶座", "双鱼座"];
 const MBTI_TYPES = Object.keys(MBTI_DESCRIPTIONS);
 
 const ProfileModal: React.FC<ProfileModalProps> = ({ userProfile, onSave, onClose }) => {

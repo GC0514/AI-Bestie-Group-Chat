@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData, PersonaInterests, RegenerationSource } from './types';
 import { getBestiesResponse, getSingleBestieResponse, generateDiaryEntry as generateDiaryEntryService, getProactiveGreeting, extractMemories } from './services/geminiService';
 import { PERSONA_INTEREST_MAP } from './data/interests';
@@ -25,7 +25,7 @@ export const LocalizationContext = React.createContext({
 // Helper to simulate typing delay
 const calculateTypingDelay = (text: string): number => {
     const baseDelay = 300; // Minimum delay
-    const perCharDelay = 40; // ms per character
+    const perCharDelay = 50; // ms per character
     return baseDelay + (text.length * perCharDelay);
 };
 
@@ -54,7 +54,7 @@ const updatePersonaInterests = (keyMemories: Record<string, string[]>): PersonaI
 };
 
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [conversations, setConversations] = useState<Partial<Record<ConversationID, Conversation>>>(() => {
     const defaultState = {
         group: {
@@ -111,7 +111,7 @@ const App: React.FC = () => {
   const [activeChatId, setActiveChatId] = useState<ConversationID>('group');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [theme, setTheme] = useState<Theme>('light');
-  const [language, setLanguage] = useState<Language>('zh');
+  const { language } = useContext(LocalizationContext);
   const [activeView, setActiveView] = useState<'chats' | 'contacts' | 'diary'>('chats');
   const [profileCardPersona, setProfileCardPersona] = useState<PersonaName | null>(null);
   const [isProfileModalOpen, setProfileModalOpen] = useState(false);
@@ -188,11 +188,17 @@ const App: React.FC = () => {
         }
 
         setIsLoading(true);
+        loadingTimeoutRef.current = setTimeout(() => {
+            console.error("Watchdog timeout triggered during proactive greeting. Forcing loading to false.");
+            setIsLoading(false);
+        }, 35000);
+
         try {
             const recentUserMessages = groupMessages.filter(m => m.sender === 'Me').slice(-5);
             const recentDiaryEntry = diaryEntries.length > 0 ? diaryEntries[0] : null;
 
             if (recentUserMessages.length === 0 && !recentDiaryEntry) {
+                clearLoadingTimeout();
                 setIsLoading(false);
                 return;
             }
@@ -200,14 +206,17 @@ const App: React.FC = () => {
             const context = { recentUserMessages, recentDiaryEntry, userProfile };
             
             const greetings = await getProactiveGreeting(context, language);
+            
+            clearLoadingTimeout();
+            setIsLoading(false);
+
             if (greetings.length === 0) {
-              setIsLoading(false);
               return;
             }
             
             let cumulativeDelay = 0;
             greetings.forEach((greeting) => {
-                const thinkingPause = Math.random() * 1500 + 500; // 0.5 to 2 sec pause
+                const thinkingPause = Math.random() * 2000 + 800;
                 cumulativeDelay += thinkingPause;
 
                 setTimeout(() => {
@@ -220,14 +229,11 @@ const App: React.FC = () => {
                         };
                     });
                 }, cumulativeDelay);
-                
-                cumulativeDelay += calculateTypingDelay(greeting.text);
             });
-            
-            setTimeout(() => setIsLoading(false), cumulativeDelay);
 
         } catch (e) {
             console.error("Failed to get proactive greeting:", e);
+            clearLoadingTimeout();
             setIsLoading(false); 
         }
     };
@@ -236,11 +242,6 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language, userProfile]); 
-
-
-  const t = useCallback((key: string) => {
-    return locales[language][key] || locales['en'][key] || key;
-  }, [language]);
 
 
   const startPrivateChat = useCallback((personaName: PersonaName) => {
@@ -323,28 +324,21 @@ const App: React.FC = () => {
       if (chatId === 'group') {
         const aiResponses = await getBestiesResponse(text, language, userProfile, personaInterests);
         
+        clearLoadingTimeout();
+        setIsLoading(false);
+        
         let cumulativeDelay = 0;
         aiResponses.forEach((res) => {
-          // Add a random "thinking" pause before each message
-          const thinkingPause = Math.random() * 1500 + 500; // 0.5 to 2 seconds pause
-          cumulativeDelay += thinkingPause;
-
-          // Schedule the message to appear after the cumulative delay
-          setTimeout(() => {
-            setConversations(prev => ({
-              ...prev,
-              [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, { ...res, timestamp: Date.now() }] }
-            }));
-          }, cumulativeDelay);
-
-          // Add the message's own "typing" duration to the delay for the *next* message
-          cumulativeDelay += calculateTypingDelay(res.text); 
+            const thinkingPause = Math.random() * 1800 + 500; // 0.5s to 2.3s pause before this message appears
+            cumulativeDelay += thinkingPause;
+            
+            setTimeout(() => {
+                setConversations(prev => ({
+                ...prev,
+                [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, { ...res, timestamp: Date.now() }] }
+                }));
+            }, cumulativeDelay);
         });
-
-        setTimeout(() => {
-            clearLoadingTimeout();
-            setIsLoading(false)
-        }, cumulativeDelay);
 
       } else {
         const personaName = chatId as PersonaName;
@@ -352,14 +346,15 @@ const App: React.FC = () => {
         const history = currentConversation ? currentConversation.messages.slice(-10) : [];
         const aiResponse = await getSingleBestieResponse(text, personaName, history, language, userProfile, personaInterests);
         
+        clearLoadingTimeout();
+        setIsLoading(false);
+
         const delay = calculateTypingDelay(aiResponse.text);
         setTimeout(() => {
              setConversations(prev => ({
                 ...prev,
                 [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, { ...aiResponse, timestamp: Date.now() }] }
             }));
-            clearLoadingTimeout();
-            setIsLoading(false);
         }, delay);
       }
     } catch (e) {
@@ -512,12 +507,7 @@ const App: React.FC = () => {
     setRegenerateModalOpen(true);
   };
 
-
   const activeConversation = conversations[activeChatId];
-
-  if (!userProfile) {
-    return <OnboardingModal onSave={handleSaveProfile} />;
-  }
   
   const renderMainView = () => {
     switch(activeView) {
@@ -542,70 +532,86 @@ const App: React.FC = () => {
     }
   }
 
+  if (!userProfile) {
+    return <OnboardingModal onSave={handleSaveProfile} />;
+  }
+
   return (
-    <LocalizationContext.Provider value={{ t, setLanguage, language }}>
-      <div className="flex h-screen bg-[var(--ui-bg)] text-[var(--text-color-primary)] backdrop-blur-xl font-sans">
-        
-        <div className="flex flex-col flex-shrink-0 w-full md:w-[25rem] lg:w-[28rem] border-r border-[var(--ui-border)]">
-           <TopBar 
-                theme={theme} 
-                setTheme={setTheme}
-                onExport={handleExportData}
-                onImport={handleImportData}
-                onEditProfile={() => setProfileModalOpen(true)}
-            />
-           <div className="flex flex-grow overflow-hidden">
-              <Sidebar activeView={activeView} setActiveView={setActiveView} />
-              <div className="flex-1 overflow-hidden">
-                {activeView === 'chats' || activeView === 'diary' ? (
-                  <ChatList
-                    conversations={Object.values(conversations)}
-                    activeChatId={activeChatId}
-                    onSelectChat={(id) => {
-                        setActiveChatId(id);
-                        setActiveView('chats');
-                    }}
-                    onCloseChat={handleCloseChat}
-                  />
-                ) : (
-                  <ContactsView onSelectPersona={setProfileCardPersona} />
-                )}
-              </div>
-           </div>
-        </div>
-        
-        <div className="flex-1 flex flex-col">
-          {renderMainView()}
-        </div>
-        
-        {profileCardPersona && (
-          <ProfileCard 
-            persona={PERSONAS[profileCardPersona]} 
-            onClose={() => setProfileCardPersona(null)}
-            onStartChat={startPrivateChat}
+    <div className="flex h-screen bg-[var(--ui-bg)] text-[var(--text-color-primary)] backdrop-blur-xl font-sans">
+      <div className="flex flex-col flex-shrink-0 w-full md:w-[25rem] lg:w-[28rem] border-r border-[var(--ui-border)]">
+        <TopBar 
+              theme={theme} 
+              setTheme={setTheme}
+              onExport={handleExportData}
+              onImport={handleImportData}
+              onEditProfile={() => setProfileModalOpen(true)}
           />
-        )}
-        {isProfileModalOpen && (
-          <ProfileModal
-            userProfile={userProfile}
-            onSave={(updatedProfile) => {
-                setUserProfile(updatedProfile);
-                setProfileModalOpen(false);
-            }}
-            onClose={() => setProfileModalOpen(false)}
-          />
-        )}
-        {isRegenerateModalOpen && diaryToRegenerate && (
-            <RegenerateDiaryModal
-                entry={diaryToRegenerate}
-                onClose={() => setRegenerateModalOpen(false)}
-                onRegenerate={handleRegenerateDiary}
-            />
-        )}
-        <input type="file" accept=".json" ref={fileInputRef} onChange={onFileImport} style={{ display: 'none' }} />
+        <div className="flex flex-grow overflow-hidden">
+            <Sidebar activeView={activeView} setActiveView={setActiveView} />
+            <div className="flex-1 overflow-hidden">
+              {activeView === 'chats' || activeView === 'diary' ? (
+                <ChatList
+                  conversations={Object.values(conversations)}
+                  activeChatId={activeChatId}
+                  onSelectChat={(id) => {
+                      setActiveChatId(id);
+                      setActiveView('chats');
+                  }}
+                  onCloseChat={handleCloseChat}
+                />
+              ) : (
+                <ContactsView onSelectPersona={setProfileCardPersona} />
+              )}
+            </div>
+        </div>
       </div>
-    </LocalizationContext.Provider>
+      
+      <div className="flex-1 flex flex-col">
+        {renderMainView()}
+      </div>
+      
+      {profileCardPersona && (
+        <ProfileCard 
+          persona={PERSONAS[profileCardPersona]} 
+          onClose={() => setProfileCardPersona(null)}
+          onStartChat={startPrivateChat}
+        />
+      )}
+      {isProfileModalOpen && (
+        <ProfileModal
+          userProfile={userProfile}
+          onSave={(updatedProfile) => {
+              setUserProfile(updatedProfile);
+              setProfileModalOpen(false);
+          }}
+          onClose={() => setProfileModalOpen(false)}
+        />
+      )}
+      {isRegenerateModalOpen && diaryToRegenerate && (
+          <RegenerateDiaryModal
+              entry={diaryToRegenerate}
+              onClose={() => setRegenerateModalOpen(false)}
+              onRegenerate={handleRegenerateDiary}
+          />
+      )}
+      <input type="file" accept=".json" ref={fileInputRef} onChange={onFileImport} style={{ display: 'none' }} />
+    </div>
   );
+};
+
+
+const App: React.FC = () => {
+    const [language, setLanguage] = useState<Language>('zh');
+
+    const t = useCallback((key: string) => {
+        return locales[language][key] || locales['en'][key] || key;
+    }, [language]);
+
+    return (
+        <LocalizationContext.Provider value={{ t, setLanguage, language }}>
+            <AppContent />
+        </LocalizationContext.Provider>
+    );
 };
 
 export default App;

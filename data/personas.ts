@@ -1,3 +1,4 @@
+
 import type { Persona, PersonaName } from '../types';
 import * as Avatars from '../assets/images';
 
@@ -142,3 +143,5 @@ export const MBTI_DESCRIPTIONS: Record<string, string> = {
     "ESTP": "聪明、精力充沛、感知力强的社交者",
     "ESFP": "自发、精力充沛、热情的表演者"
 };
+
+export const ZODIAC_SIGNS = ["白羊座", "金牛座", "双子座", "巨蟹座", "狮子座", "处女座", "天秤座", "天蝎座", "射手座", "摩羯座", "水瓶座", "双鱼座"];
