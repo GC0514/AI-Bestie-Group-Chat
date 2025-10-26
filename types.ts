@@ -46,7 +46,7 @@ export interface UserProfile {
   zodiac: string;
   mbti: string;
   tags: string[];
-  keyMemories: Record<string, string[]>; // For dynamic memory
+  keyMemories?: Record<string, string[]>; // For dynamic memory
 }
 
 export interface DiaryEntry {
@@ -66,3 +66,5 @@ export interface ProactiveContext {
     recentDiaryEntry: DiaryEntry | null;
     userProfile: UserProfile;
 }
+
+export type PersonaInterests = Partial<Record<PersonaName, string[]>>;

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import type { ChatMessage, PersonaName, Language, UserProfile, DiaryEntry, ProactiveContext } from '../types';
+import type { ChatMessage, PersonaName, Language, UserProfile, DiaryEntry, ProactiveContext, PersonaInterests } from '../types';
 import { 
   getSystemPromptGroup, 
   getSystemPromptSingle, 
@@ -97,15 +97,15 @@ const memoryExtractionSchema = {
 };
 
 
-export async function getBestiesResponse(userMessage: string, lang: Language, userProfile: UserProfile): Promise<ChatMessage[]> {
+export async function getBestiesResponse(userMessage: string, lang: Language, userProfile: UserProfile, personaInterests: PersonaInterests): Promise<ChatMessage[]> {
   try {
-    const prompt = `The user, ${userProfile.nickname}, says: "${userMessage}". Generate the responses from the 8 AI personas.`;
+    const prompt = `The user, ${userProfile.nickname}, says: "${userMessage}". Generate responses from the AI personas based on the new dynamic rules.`;
 
     const response = await withTimeout(ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        systemInstruction: getSystemPromptGroup(lang, userProfile),
+        systemInstruction: getSystemPromptGroup(lang, userProfile, personaInterests),
         responseMimeType: "application/json",
         responseSchema: groupResponseSchema,
       }
@@ -117,31 +117,39 @@ export async function getBestiesResponse(userMessage: string, lang: Language, us
     if (Array.isArray(parsedResponse)) {
       return parsedResponse as ChatMessage[];
     } else {
-      throw new Error("Invalid response format from API for group chat.");
+      console.warn("Group response was not an array, returning empty.", parsedResponse);
+      return [];
     }
   } catch (error) {
-    console.error("Error calling Gemini API:", error);
+    console.error("Error calling Gemini API for group response:", error);
     throw new Error("Failed to get response from AI besties.");
   }
 }
 
-export async function getSingleBestieResponse(userMessage: string, personaName: PersonaName, history: ChatMessage[], lang: Language, userProfile: UserProfile): Promise<ChatMessage> {
+export async function getSingleBestieResponse(userMessage: string, personaName: PersonaName, history: ChatMessage[], lang: Language, userProfile: UserProfile, personaInterests: PersonaInterests): Promise<ChatMessage> {
+    const prompt = `Here is the recent chat history for context:\n${history.map(m => `${m.sender}: ${m.text}`).join('\n')}\n\n${userProfile.nickname} (Me) says: "${userMessage}".\n\nNow, generate your response as ${personaName}.`;
+    
     try {
-        const chatHistory = history.map(m => `${m.sender}: ${m.text}`).join('\n');
-        const prompt = `Here is the recent chat history for context:\n${chatHistory}\n\n${userProfile.nickname} (Me) says: "${userMessage}".\n\nNow, generate your response as ${personaName}.`;
-        
         const response = await withTimeout(ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
-                systemInstruction: getSystemPromptSingle(personaName, lang, userProfile),
+                systemInstruction: getSystemPromptSingle(personaName, lang, userProfile, personaInterests),
                 responseMimeType: "application/json",
                 responseSchema: singleResponseSchema,
             }
         }), API_TIMEOUT);
 
         const jsonText = response.text.trim();
-        const parsedResponse = JSON.parse(jsonText);
+        let parsedResponse;
+
+        try {
+            parsedResponse = JSON.parse(jsonText);
+        } catch (parseError) {
+            console.error("Failed to parse single bestie response JSON:", parseError);
+            console.error("Original non-JSON response:", jsonText);
+            throw new Error(`Received an invalid response from ${personaName}.`);
+        }
         
         if (parsedResponse && typeof parsedResponse.sender === 'string' && typeof parsedResponse.text === 'string') {
              return parsedResponse as ChatMessage;

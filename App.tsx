@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData } from './types';
+import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData, PersonaInterests } from './types';
 import { getBestiesResponse, getSingleBestieResponse, generateDiaryEntry, getProactiveGreeting, extractMemories } from './services/geminiService';
+import { PERSONA_INTEREST_MAP } from './data/interests';
 import { PERSONAS } from './data/personas';
 import { locales } from './data/locales';
 import Sidebar from './components/Sidebar';
@@ -24,33 +25,59 @@ export const LocalizationContext = React.createContext({
 const calculateTypingDelay = (text: string): number => {
     const baseDelay = 500; // Minimum delay in ms
     const perCharDelay = 35; // ms per character
-    const randomFactor = Math.random() * 300; // Add some randomness
+    const randomFactor = Math.random() * 500; // Add some randomness
     return baseDelay + (text.length * perCharDelay) + randomFactor;
+};
+
+// Utility to update persona interests based on user's key memories
+const updatePersonaInterests = (keyMemories: Record<string, string[]>): PersonaInterests => {
+    const newPersonaInterests: PersonaInterests = {};
+    for (const personaName in PERSONAS) {
+        newPersonaInterests[personaName as PersonaName] = [];
+    }
+
+    const allUserInterests = new Set<string>();
+    Object.values(keyMemories).forEach(values => {
+        values.forEach(value => allUserInterests.add(value.toLowerCase()));
+    });
+
+    for (const [interest, personas] of Object.entries(PERSONA_INTEREST_MAP)) {
+        if (allUserInterests.has(interest.toLowerCase())) {
+            personas.forEach(pName => {
+                if (newPersonaInterests[pName]) {
+                    newPersonaInterests[pName].push(interest);
+                }
+            });
+        }
+    }
+    return newPersonaInterests;
 };
 
 
 const App: React.FC = () => {
   const [conversations, setConversations] = useState<Partial<Record<ConversationID, Conversation>>>(() => {
+    const defaultState = {
+        group: {
+          id: 'group',
+          name: '闺蜜团 (Group Chat)',
+          messages: [{ sender: 'System', text: "Your besties are here! Tell them what's on your mind.", timestamp: Date.now() }],
+          isGroup: true,
+        },
+    };
     try {
       const savedConvos = localStorage.getItem('conversations');
-      return savedConvos ? JSON.parse(savedConvos) : {
-        group: {
-          id: 'group',
-          name: '闺蜜团 (Group Chat)',
-          messages: [{ sender: 'System', text: "Your besties are here! Tell them what's on your mind.", timestamp: Date.now() }],
-          isGroup: true,
-        },
-      };
+      if (savedConvos) {
+          const loadedConvos = JSON.parse(savedConvos);
+          // FORTIFIED LOADING: Ensure the essential group chat exists. If not, add it.
+          if (!loadedConvos.group) {
+              loadedConvos.group = defaultState.group;
+          }
+          return loadedConvos;
+      }
+      return defaultState;
     } catch (error) {
       console.error("Failed to load conversations from localStorage", error);
-      return {
-        group: {
-          id: 'group',
-          name: '闺蜜团 (Group Chat)',
-          messages: [{ sender: 'System', text: "Your besties are here! Tell them what's on your mind.", timestamp: Date.now() }],
-          isGroup: true,
-        },
-      };
+      return defaultState;
     }
   });
 
@@ -59,7 +86,6 @@ const App: React.FC = () => {
         const savedProfile = localStorage.getItem('userProfile');
         if (savedProfile) {
             const profile = JSON.parse(savedProfile);
-            // Ensure keyMemories exists for backward compatibility
             if (!profile.keyMemories) {
                 profile.keyMemories = {};
             }
@@ -82,6 +108,7 @@ const App: React.FC = () => {
     }
   });
 
+  const [personaInterests, setPersonaInterests] = useState<PersonaInterests>({});
   const [activeChatId, setActiveChatId] = useState<ConversationID>('group');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [theme, setTheme] = useState<Theme>('light');
@@ -91,6 +118,14 @@ const App: React.FC = () => {
   const [isProfileModalOpen, setProfileModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Effect to update persona interests when user memories change
+  useEffect(() => {
+    if (userProfile?.keyMemories) {
+        const newInterests = updatePersonaInterests(userProfile.keyMemories);
+        setPersonaInterests(newInterests);
+    }
+  }, [userProfile?.keyMemories]);
 
 
   const clearLoadingTimeout = useCallback(() => {
@@ -125,7 +160,7 @@ const App: React.FC = () => {
             localStorage.setItem('userProfile', JSON.stringify(userProfile));
         }
     } catch (error) {
-        console.error("Failed to save user profile to localStorage", error);
+        console.error("Failed to save user profile from localStorage", error);
     }
   }, [userProfile]);
 
@@ -133,7 +168,7 @@ const App: React.FC = () => {
     try {
       localStorage.setItem('diaryEntries', JSON.stringify(diaryEntries));
     } catch (error) {
-      console.error("Failed to save diary entries to localStorage", error);
+      console.error("Failed to save diary entries from localStorage", error);
     }
   }, [diaryEntries]);
 
@@ -172,9 +207,12 @@ const App: React.FC = () => {
               return;
             }
             
-            let cumulativeDelay = 0;
+            let maxDelay = 0;
             greetings.forEach((greeting) => {
-                const delay = calculateTypingDelay(greeting.text);
+                const delay = calculateTypingDelay(greeting.text) + Math.random() * 1000; // Add extra randomness
+                if (delay > maxDelay) {
+                    maxDelay = delay;
+                }
                 setTimeout(() => {
                     setConversations(prev => {
                         const groupChat = prev.group;
@@ -184,11 +222,10 @@ const App: React.FC = () => {
                             group: { ...groupChat, messages: [...groupChat.messages, { ...greeting, timestamp: Date.now() }] }
                         };
                     });
-                }, cumulativeDelay);
-                cumulativeDelay += delay;
+                }, delay);
             });
             
-            setTimeout(() => setIsLoading(false), cumulativeDelay);
+            setTimeout(() => setIsLoading(false), maxDelay);
 
         } catch (e) {
             console.error("Failed to get proactive greeting:", e);
@@ -285,29 +322,33 @@ const App: React.FC = () => {
 
     try {
       if (chatId === 'group') {
-        const aiResponses = await getBestiesResponse(text, language, userProfile);
-        let cumulativeDelay = 0;
+        const aiResponses = await getBestiesResponse(text, language, userProfile, personaInterests);
+        let maxDelay = 0;
         aiResponses.forEach((res) => {
-          const delay = calculateTypingDelay(res.text);
+          // Each response gets its own randomized delay, not cumulative
+          const delay = calculateTypingDelay(res.text) + Math.random() * 1500;
+          if (delay > maxDelay) {
+            maxDelay = delay;
+          }
           setTimeout(() => {
             setConversations(prev => ({
               ...prev,
               [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, { ...res, timestamp: Date.now() }] }
             }));
-          }, cumulativeDelay);
-          cumulativeDelay += delay;
+          }, delay);
         });
 
+        // Set loading to false after the longest delay has passed
         setTimeout(() => {
             clearLoadingTimeout();
             setIsLoading(false)
-        }, cumulativeDelay);
+        }, maxDelay);
 
       } else {
         const personaName = chatId as PersonaName;
         const currentConversation = conversations[chatId];
         const history = currentConversation ? currentConversation.messages.slice(-10) : [];
-        const aiResponse = await getSingleBestieResponse(text, personaName, history, language, userProfile);
+        const aiResponse = await getSingleBestieResponse(text, personaName, history, language, userProfile, personaInterests);
         
         const delay = calculateTypingDelay(aiResponse.text);
         setTimeout(() => {
@@ -329,7 +370,7 @@ const App: React.FC = () => {
       clearLoadingTimeout();
       setIsLoading(false);
     }
-  }, [language, userProfile, conversations, clearLoadingTimeout]);
+  }, [language, userProfile, conversations, clearLoadingTimeout, personaInterests]);
 
   const handleGenerateDiary = useCallback(async (chatId: ConversationID) => {
     if (!userProfile) return;
