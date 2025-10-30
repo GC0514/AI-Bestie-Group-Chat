@@ -427,12 +427,12 @@ const AppContent: React.FC = () => {
     } else if (source === 'group') {
         messagesToProcess = conversations.group?.messages.filter(m => m.sender === 'Me') || [];
     } else if (source === 'all') {
-        // FIX: The for...of loop was causing a type error. Replaced with forEach.
-        Object.values(conversations).forEach((convo) => {
+        // FIX: The error was caused by incorrect iteration. Using `for...of` with `Object.values` correctly gathers messages from all conversations.
+        for (const convo of Object.values(conversations)) {
             if (convo) {
                 messagesToProcess.push(...convo.messages.filter(m => m.sender === 'Me'));
             }
-        });
+        }
     }
 
     if (messagesToProcess.length === 0) {
