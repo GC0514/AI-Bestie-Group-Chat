@@ -2,20 +2,26 @@
 import React, { useContext } from 'react';
 import type { DiaryEntry } from '../types';
 import { LocalizationContext } from '../App';
-import { DiaryIcon } from './Icons';
+import { DiaryIcon, BackIcon } from './Icons';
 
 interface DiaryViewProps {
   entries: DiaryEntry[];
   onRegenerate: (entry: DiaryEntry) => void;
+  onBack?: () => void;
 }
 
-const DiaryView: React.FC<DiaryViewProps> = ({ entries, onRegenerate }) => {
+const DiaryView: React.FC<DiaryViewProps> = ({ entries, onRegenerate, onBack }) => {
     const { t } = useContext(LocalizationContext);
     
     return (
         <div className="flex flex-col flex-1 h-full bg-[var(--ui-bg)]">
             <header className="p-4 bg-[var(--ui-panel-bg)] backdrop-blur-sm border-b border-[var(--ui-border)] shadow-sm flex-shrink-0">
                 <div className="flex items-center gap-3">
+                    {onBack && (
+                         <button onClick={onBack} className="md:hidden p-2 -ml-2 text-[var(--text-color-secondary)] hover:text-[var(--text-color-primary)]">
+                            <BackIcon />
+                        </button>
+                    )}
                     <DiaryIcon isActive className="w-6 h-6" />
                     <h1 className="text-lg font-bold text-[var(--text-color-primary)]">
                         {t('myDiary')}

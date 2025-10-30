@@ -1,3 +1,4 @@
+
 import React, { useContext } from 'react';
 import type { Conversation, ConversationID, PersonaName } from '../types';
 import { CloseIcon } from './Icons';
@@ -6,7 +7,7 @@ import { LocalizationContext } from '../App';
 
 interface ChatListProps {
   conversations: Conversation[];
-  activeChatId: ConversationID;
+  activeChatId: ConversationID | null;
   onSelectChat: (id: ConversationID) => void;
   onCloseChat: (id: ConversationID) => void;
 }
@@ -37,13 +38,14 @@ const ChatList: React.FC<ChatListProps> = ({ conversations, activeChatId, onSele
   };
 
   return (
-    <div className="h-full bg-[var(--ui-panel-bg)] flex flex-col">
+    <div className="h-full bg-[var(--ui-panel-bg)] md:bg-transparent flex flex-col">
       <header className="p-4 border-b border-[var(--ui-border)] flex-shrink-0">
         <h2 className="text-xl font-bold">{t('chats')}</h2>
       </header>
       <div className="flex-1 overflow-y-auto">
         <ul>
           {conversations.map(convo => {
+            if (!convo) return null;
             const isActive = convo.id === activeChatId;
             const lastMessage = convo.messages[convo.messages.length - 1];
             return (
@@ -58,7 +60,7 @@ const ChatList: React.FC<ChatListProps> = ({ conversations, activeChatId, onSele
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <h3 className="font-semibold truncate">{convo.isGroup ? t('groupChat') : convo.name}</h3>
-                  {lastMessage && <p className="text-sm text-[var(--text-color-secondary)] truncate">{lastMessage.sender === 'Me' ? 'You: ' : ''}{lastMessage.text}</p>}
+                  {lastMessage && <p className="text-sm text-[var(--text-color-secondary)] truncate">{lastMessage.sender === 'Me' ? `${t('you')}: ` : ''}{lastMessage.text}</p>}
                 </div>
                 {!convo.isGroup && (
                   <button

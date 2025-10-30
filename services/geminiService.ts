@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import type { ChatMessage, PersonaName, Language, UserProfile, DiaryEntry, ProactiveContext, PersonaInterests } from '../types';
 import { 
@@ -101,28 +100,42 @@ const memoryExtractionSchema = {
 
 export async function getBestiesResponse(userMessage: string, lang: Language, userProfile: UserProfile, personaInterests: PersonaInterests): Promise<ChatMessage[]> {
   try {
-    const dynamicContent = `
-# USER PROFILE (Your Best Friend)
+    const systemInstructionWithContext = `
+${getSystemPromptGroupOptimized(lang, userProfile)}
+
+# CONTEXT FOR THIS CONVERSATION
+## USER PROFILE (Your Best Friend)
 ${userProfileForPrompt(userProfile, lang)}
 ${personaInterestsForPrompt(personaInterests, userProfile)}
-# AI PERSONA ROSTER (每个角色都有自己的生活和个性)
+
+## AI PERSONA ROSTER (每个角色都有自己的生活和个性)
 ${personaDetailsForPrompt}
-# CURRENT CONVERSATION
-The user, ${userProfile.nickname}, says: "${userMessage}". Generate responses from the AI personas based on all the rules and context provided.
 `;
 
-    const response = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: dynamicContent,
+      contents: userMessage, // Use raw user message for contents
       config: {
-        systemInstruction: getSystemPromptGroupOptimized(lang, userProfile),
+        systemInstruction: systemInstructionWithContext,
         responseMimeType: "application/json",
         responseSchema: groupResponseSchema,
       }
     }), API_TIMEOUT);
+    
+    let parsedResponse;
+    try {
+        const jsonText = response.text.trim();
+        if (!jsonText) {
+             console.warn("Received empty response from API for group chat.");
+             return [];
+        }
+        parsedResponse = JSON.parse(jsonText);
+    } catch (parseError) {
+        console.error("Failed to parse group response JSON:", parseError);
+        console.error("Original non-JSON response from API:", response.text);
+        return []; // Fail gracefully
+    }
 
-    const jsonText = response.text.trim();
-    const parsedResponse = JSON.parse(jsonText);
 
     if (Array.isArray(parsedResponse)) {
       return parsedResponse as ChatMessage[];
@@ -140,7 +153,7 @@ export async function getSingleBestieResponse(userMessage: string, personaName: 
     const prompt = `Here is the recent chat history for context:\n${history.map(m => `${m.sender}: ${m.text}`).join('\n')}\n\n${userProfile.nickname} (Me) says: "${userMessage}".\n\nNow, generate your response as ${personaName}.`;
     
     try {
-        const response = await withTimeout(ai.models.generateContent({
+        const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
@@ -150,14 +163,17 @@ export async function getSingleBestieResponse(userMessage: string, personaName: 
             }
         }), API_TIMEOUT);
 
-        const jsonText = response.text.trim();
         let parsedResponse;
-
         try {
+            const jsonText = response.text.trim();
+            if (!jsonText) {
+                console.warn(`Received empty response from API for ${personaName}.`);
+                throw new Error(`Received an empty response from ${personaName}.`);
+            }
             parsedResponse = JSON.parse(jsonText);
         } catch (parseError) {
-            console.error("Failed to parse single bestie response JSON:", parseError);
-            console.error("Original non-JSON response:", jsonText);
+            console.error(`Failed to parse single bestie response JSON for ${personaName}:`, parseError);
+            console.error("Original non-JSON response:", response.text);
             throw new Error(`Received an invalid response from ${personaName}.`);
         }
         
@@ -177,7 +193,7 @@ export async function generateDiaryEntry(userMessages: ChatMessage[], lang: Lang
         const userChatHistory = userMessages.map(msg => msg.text).join('\n');
         const prompt = `Here are the user's recent thoughts:\n---\n${userChatHistory}\n---\nBased on these, please write a diary entry.`;
 
-        const response = await withTimeout(ai.models.generateContent({
+        const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
@@ -187,8 +203,19 @@ export async function generateDiaryEntry(userMessages: ChatMessage[], lang: Lang
             }
         }), API_TIMEOUT);
 
-        const jsonText = response.text.trim();
-        const parsedResponse = JSON.parse(jsonText);
+        let parsedResponse;
+        try {
+            const jsonText = response.text.trim();
+            if (!jsonText) {
+                console.warn("Received empty response from API for diary generation.");
+                throw new Error("Failed to generate diary: empty response.");
+            }
+            parsedResponse = JSON.parse(jsonText);
+        } catch (parseError) {
+            console.error("Failed to parse diary entry JSON:", parseError);
+            console.error("Original non-JSON response:", response.text);
+            throw new Error("Received an invalid response for diary generation.");
+        }
 
         if (parsedResponse && parsedResponse.title && parsedResponse.content) {
             return parsedResponse as Omit<DiaryEntry, 'date' | 'sourceChatId'>;
@@ -214,7 +241,7 @@ export async function getProactiveGreeting(context: ProactiveContext, lang: Lang
     }
     contextSummary += `\nIt's a new day/session. Please generate some caring greetings based on this context.`;
     
-    const response = await withTimeout(ai.models.generateContent({
+    const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: contextSummary,
       config: {
@@ -224,8 +251,20 @@ export async function getProactiveGreeting(context: ProactiveContext, lang: Lang
       }
     }), API_TIMEOUT);
 
-    const jsonText = response.text.trim();
-    const parsedResponse = JSON.parse(jsonText);
+    let parsedResponse;
+    try {
+        const jsonText = response.text.trim();
+        if (!jsonText) {
+            console.warn("Received empty response from API for proactive greeting.");
+            return [];
+        }
+        parsedResponse = JSON.parse(jsonText);
+    } catch (parseError) {
+        console.error("Failed to parse proactive greeting JSON:", parseError);
+        console.error("Original non-JSON response:", response.text);
+        return []; // Fail gracefully
+    }
+
 
     if (Array.isArray(parsedResponse)) {
       return parsedResponse as ChatMessage[];
@@ -242,7 +281,7 @@ export async function getProactiveGreeting(context: ProactiveContext, lang: Lang
 
 export async function extractMemories(userMessage: string, lang: Language): Promise<Record<string, string[]>> {
     try {
-        const response = await withTimeout(ai.models.generateContent({
+        const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: userMessage,
             config: {
@@ -253,8 +292,20 @@ export async function extractMemories(userMessage: string, lang: Language): Prom
             }
         }), API_TIMEOUT);
 
-        const jsonText = response.text.trim();
-        const parsedResponse = JSON.parse(jsonText);
+        let parsedResponse;
+        try {
+            const jsonText = response.text.trim();
+            if (!jsonText) {
+                console.warn("Received empty response from API for memory extraction.");
+                return {};
+            }
+            parsedResponse = JSON.parse(jsonText);
+        } catch (parseError) {
+            console.error("Failed to parse memory extraction JSON:", parseError);
+            console.error("Original non-JSON response:", response.text);
+            return {}; // Fail gracefully
+        }
+
 
         if (typeof parsedResponse === 'object' && parsedResponse !== null) {
             return parsedResponse as Record<string, string[]>;

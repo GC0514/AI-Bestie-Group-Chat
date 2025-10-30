@@ -1,10 +1,12 @@
+
 import React, { useContext } from 'react';
 import { ChatIcon, ContactsIcon, DiaryIcon } from './Icons';
 import { LocalizationContext } from '../App';
+import type { View } from '../types';
 
 interface SidebarProps {
-  activeView: 'chats' | 'contacts' | 'diary';
-  setActiveView: (view: 'chats' | 'contacts' | 'diary') => void;
+  activeView: View;
+  setActiveView: (view: View) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {

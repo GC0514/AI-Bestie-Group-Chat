@@ -36,6 +36,8 @@ export interface Conversation {
 
 export type Theme = 'light' | 'dark';
 export type Language = 'en' | 'zh';
+export type View = 'chats' | 'contacts' | 'diary' | 'me';
+
 
 export type LocaleStrings = {
     [key: string]: string;
@@ -48,6 +50,7 @@ export interface UserProfile {
   mbti: string;
   tags: string[];
   keyMemories?: Record<string, string[]>; // For dynamic memory
+  avatar?: string; // Optional field for user avatar
 }
 
 export interface DiaryEntry {

@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useContext } from 'react';
-import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData, PersonaInterests, RegenerationSource } from './types';
+import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData, PersonaInterests, RegenerationSource, View } from './types';
 import { getBestiesResponse, getSingleBestieResponse, generateDiaryEntry as generateDiaryEntryService, getProactiveGreeting, extractMemories } from './services/geminiService';
 import { PERSONA_INTEREST_MAP } from './data/interests';
 import { PERSONAS } from './data/personas';
@@ -15,6 +16,8 @@ import OnboardingModal from './components/OnboardingModal';
 import DiaryView from './components/DiaryView';
 import ProfileModal from './components/ProfileModal';
 import RegenerateDiaryModal from './components/RegenerateDiaryModal';
+import BottomNavBar from './components/BottomNavBar';
+import MeView from './components/MeView';
 
 export const LocalizationContext = React.createContext({
   t: (key: string) => locales.en[key] || key,
@@ -108,15 +111,17 @@ const AppContent: React.FC = () => {
   });
 
   const [personaInterests, setPersonaInterests] = useState<PersonaInterests>({});
-  const [activeChatId, setActiveChatId] = useState<ConversationID>('group');
+  const [activeChatId, setActiveChatId] = useState<ConversationID | null>('group');
+  const [isChatOpen, setIsChatOpen] = useState(false); // New state for mobile navigation
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [theme, setTheme] = useState<Theme>('light');
   const { language } = useContext(LocalizationContext);
-  const [activeView, setActiveView] = useState<'chats' | 'contacts' | 'diary'>('chats');
+  const [activeView, setActiveView] = useState<View>('chats');
   const [profileCardPersona, setProfileCardPersona] = useState<PersonaName | null>(null);
   const [isProfileModalOpen, setProfileModalOpen] = useState(false);
   const [isRegenerateModalOpen, setRegenerateModalOpen] = useState(false);
   const [diaryToRegenerate, setDiaryToRegenerate] = useState<DiaryEntry | null>(null);
+  const [isDiaryViewOpen, setIsDiaryViewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -256,6 +261,7 @@ const AppContent: React.FC = () => {
     }
     setActiveChatId(personaName);
     setActiveView('chats');
+    setIsChatOpen(true);
     setProfileCardPersona(null);
   }, [conversations]);
   
@@ -284,8 +290,8 @@ const AppContent: React.FC = () => {
   };
 
 
-  const handleSendMessage = useCallback(async (text: string, chatId: ConversationID) => {
-    if (!text.trim() || !userProfile) return;
+  const handleSendMessage = useCallback(async (text: string, chatId: ConversationID | null) => {
+    if (!text.trim() || !userProfile || !chatId) return;
     
     clearLoadingTimeout();
     
@@ -302,10 +308,17 @@ const AppContent: React.FC = () => {
         console.error("Watchdog timeout triggered. Forcing loading to false.");
         setIsLoading(false);
         const errorMessage: ChatMessage = { sender: 'System', text: 'Sorry, the request took too long and timed out. Please try again.', timestamp: Date.now() };
-        setConversations(prev => ({
-            ...prev,
-            [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, errorMessage] }
-        }));
+        setConversations(prev => {
+            const currentConvo = prev[chatId];
+            if (!currentConvo) {
+                console.warn(`Attempted to add timeout message to a non-existent conversation with ID: ${chatId}`);
+                return prev;
+            }
+            return {
+                ...prev,
+                [chatId]: { ...currentConvo, messages: [...currentConvo.messages, errorMessage] }
+            };
+        });
     }, 35000);
 
     extractMemories(text, language).then(newMemories => {
@@ -353,24 +366,31 @@ const AppContent: React.FC = () => {
         setTimeout(() => {
              setConversations(prev => ({
                 ...prev,
-                [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, { ...aiResponse, timestamp: Date.now() }] }
+                [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!, { ...aiResponse, timestamp: Date.now() }] }
             }));
         }, delay);
       }
     } catch (e) {
       console.error(e);
       const errorMessage: ChatMessage = { sender: 'System', text: 'Sorry, there was an error. Please try again later.', timestamp: Date.now() };
-      setConversations(prev => ({
-        ...prev,
-        [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, errorMessage] }
-      }));
+      setConversations(prev => {
+        const currentConvo = prev[chatId];
+        if (!currentConvo) {
+            console.warn(`Attempted to add error message to a non-existent conversation with ID: ${chatId}`);
+            return prev;
+        }
+        return {
+          ...prev,
+          [chatId]: { ...currentConvo, messages: [...currentConvo.messages, errorMessage] }
+        };
+      });
       clearLoadingTimeout();
       setIsLoading(false);
     }
   }, [language, userProfile, conversations, clearLoadingTimeout, personaInterests]);
 
-  const handleGenerateDiary = useCallback(async (chatId: ConversationID) => {
-    if (!userProfile) return;
+  const handleGenerateDiary = useCallback(async (chatId: ConversationID | null) => {
+    if (!userProfile || !chatId) return;
     const conversation = conversations[chatId];
     if (!conversation || conversation.messages.length < 2) return;
 
@@ -386,7 +406,9 @@ const AppContent: React.FC = () => {
             sourceChatId: chatId, // Store the source of the diary entry
         };
         setDiaryEntries(prev => [newEntry, ...prev]);
-        setActiveView('diary');
+        setIsDiaryViewOpen(true);
+        setActiveView('me');
+        setIsChatOpen(false);
     } catch (error) {
         console.error("Failed to generate diary entry:", error);
     } finally {
@@ -405,7 +427,8 @@ const AppContent: React.FC = () => {
     } else if (source === 'group') {
         messagesToProcess = conversations.group?.messages.filter(m => m.sender === 'Me') || [];
     } else if (source === 'all') {
-        Object.values(conversations).forEach(convo => {
+        // FIX: The for...of loop was causing a type error. Replaced with forEach.
+        Object.values(conversations).forEach((convo) => {
             if (convo) {
                 messagesToProcess.push(...convo.messages.filter(m => m.sender === 'Me'));
             }
@@ -507,12 +530,93 @@ const AppContent: React.FC = () => {
     setRegenerateModalOpen(true);
   };
 
-  const activeConversation = conversations[activeChatId];
+  const activeConversation = activeChatId ? conversations[activeChatId] : null;
+
+  const renderMobileView = () => {
+    if (isChatOpen && activeConversation) {
+        return (
+            <ChatWindow
+              key={activeChatId}
+              conversation={activeConversation}
+              onSendMessage={handleSendMessage}
+              onGenerateDiary={handleGenerateDiary}
+              isLoading={isLoading}
+              onBack={() => setIsChatOpen(false)}
+            />
+        );
+    }
+    if (isDiaryViewOpen) {
+      return <DiaryView entries={diaryEntries} onRegenerate={openRegenerateModal} onBack={() => setIsDiaryViewOpen(false)} />;
+    }
+
+    switch (activeView) {
+      case 'chats':
+        return (
+          <ChatList
+            conversations={Object.values(conversations)}
+            activeChatId={activeChatId}
+            onSelectChat={(id) => {
+              setActiveChatId(id);
+              setIsChatOpen(true);
+            }}
+            onCloseChat={handleCloseChat}
+          />
+        );
+      case 'contacts':
+        return <ContactsView onSelectPersona={setProfileCardPersona} />;
+      case 'me':
+        return (
+          <MeView
+            userProfile={userProfile}
+            onEditProfile={() => setProfileModalOpen(true)}
+            onShowDiary={() => setIsDiaryViewOpen(true)}
+            theme={theme}
+            setTheme={setTheme}
+            onExport={handleExportData}
+            onImport={handleImportData}
+          />
+        );
+      default:
+        return null;
+    }
+  };
   
-  const renderMainView = () => {
-    switch(activeView) {
-        case 'chats':
-             return activeConversation ? (
+  return (
+    <>
+      {!userProfile && <OnboardingModal onSave={handleSaveProfile} />}
+      {userProfile && (
+        <div className="flex h-full bg-[var(--ui-bg)] text-[var(--text-color-primary)] backdrop-blur-xl font-sans">
+          {/* Desktop Layout */}
+          <div className="hidden md:flex flex-col flex-shrink-0 w-full md:w-[25rem] lg:w-[28rem] border-r border-[var(--ui-border)]">
+             <TopBar 
+                  theme={theme} 
+                  setTheme={setTheme}
+                  onExport={handleExportData}
+                  onImport={handleImportData}
+                  onEditProfile={() => setProfileModalOpen(true)}
+              />
+            <div className="flex flex-grow overflow-hidden">
+                <Sidebar activeView={activeView} setActiveView={setActiveView} />
+                <div className="flex-1 overflow-hidden">
+                  {activeView === 'chats' ? (
+                    <ChatList
+                      conversations={Object.values(conversations)}
+                      activeChatId={activeChatId}
+                      onSelectChat={(id) => {
+                          setActiveChatId(id);
+                      }}
+                      onCloseChat={handleCloseChat}
+                    />
+                  ) : activeView === 'contacts' ? (
+                     <ContactsView onSelectPersona={setProfileCardPersona} />
+                  ): (
+                    <DiaryView entries={diaryEntries} onRegenerate={openRegenerateModal} />
+                  )}
+                </div>
+            </div>
+          </div>
+          <div className="hidden md:flex flex-1 flex-col">
+            {activeConversation ? (
                 <ChatWindow
                   key={activeChatId}
                   conversation={activeConversation}
@@ -524,49 +628,15 @@ const AppContent: React.FC = () => {
                  <div className="flex-1 flex items-center justify-center text-center text-[var(--text-color-secondary)]">
                     <p>Select a chat to start messaging</p>
                 </div>
-              );
-        case 'diary':
-            return <DiaryView entries={diaryEntries} onRegenerate={openRegenerateModal} />;
-        default:
-            return <div />;
-    }
-  }
-
-  return (
-    <>
-      {!userProfile && <OnboardingModal onSave={handleSaveProfile} />}
-      {userProfile && (
-        <div className="flex h-screen bg-[var(--ui-bg)] text-[var(--text-color-primary)] backdrop-blur-xl font-sans">
-          <div className="flex flex-col flex-shrink-0 w-full md:w-[25rem] lg:w-[28rem] border-r border-[var(--ui-border)]">
-            <TopBar 
-                  theme={theme} 
-                  setTheme={setTheme}
-                  onExport={handleExportData}
-                  onImport={handleImportData}
-                  onEditProfile={() => setProfileModalOpen(true)}
-              />
-            <div className="flex flex-grow overflow-hidden">
-                <Sidebar activeView={activeView} setActiveView={setActiveView} />
-                <div className="flex-1 overflow-hidden">
-                  {activeView === 'chats' || activeView === 'diary' ? (
-                    <ChatList
-                      conversations={Object.values(conversations)}
-                      activeChatId={activeChatId}
-                      onSelectChat={(id) => {
-                          setActiveChatId(id);
-                          setActiveView('chats');
-                      }}
-                      onCloseChat={handleCloseChat}
-                    />
-                  ) : (
-                    <ContactsView onSelectPersona={setProfileCardPersona} />
-                  )}
-                </div>
-            </div>
+              )}
           </div>
           
-          <div className="flex-1 flex flex-col">
-            {renderMainView()}
+           {/* Mobile Layout */}
+          <div className="md:hidden flex flex-col w-full h-full">
+            <main className="flex-1 overflow-y-auto pb-16">
+              {renderMobileView()}
+            </main>
+            {!isChatOpen && !isDiaryViewOpen && <BottomNavBar activeView={activeView} setActiveView={setActiveView} />}
           </div>
           
           {profileCardPersona && (
