@@ -1,6 +1,6 @@
 
 import React, { useContext } from 'react';
-import { ChatIcon, ContactsIcon, DiaryIcon } from './Icons';
+import { ChatIcon, ContactsIcon, DiaryIcon, MomentsIcon } from './Icons';
 import { LocalizationContext } from '../App';
 import type { View } from '../types';
 
@@ -23,6 +23,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
                 >
                     <ChatIcon isActive={activeView === 'chats'} />
                     <span>{t('chats')}</span>
+                </button>
+                 <button 
+                    onClick={() => setActiveView('moments')} 
+                    title={t('moments')} 
+                    aria-label={t('moments')}
+                    className="flex flex-col items-center space-y-1 text-xs text-[var(--text-color-secondary)] hover:text-violet-400 transition-colors"
+                >
+                    <MomentsIcon isActive={activeView === 'moments'} />
+                    <span>{t('moments')}</span>
                 </button>
                 <button 
                     onClick={() => setActiveView('contacts')} 

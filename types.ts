@@ -7,6 +7,7 @@ export interface ChatMessage {
   sender: PersonaName | UserOrSystem;
   text: string;
   timestamp?: number;
+  userReaction?: string; // For user's emoji reaction
 }
 
 export interface Persona {
@@ -36,7 +37,7 @@ export interface Conversation {
 
 export type Theme = 'light' | 'dark';
 export type Language = 'en' | 'zh';
-export type View = 'chats' | 'contacts' | 'diary' | 'me';
+export type View = 'chats' | 'contacts' | 'diary' | 'me' | 'moments';
 
 
 export type LocaleStrings = {
@@ -75,3 +76,19 @@ export interface ProactiveContext {
 export type PersonaInterests = Partial<Record<PersonaName, string[]>>;
 
 export type RegenerationSource = 'original' | 'group' | 'all';
+
+// For "Pacts" feature
+export interface Pact {
+    id: string;
+    date: string; // YYYY-MM-DD
+    content: string;
+    acknowledged: boolean;
+}
+
+// For "Moments" feature
+export interface Moment {
+    id: string;
+    personaName: PersonaName;
+    content: string;
+    timestamp: number;
+}

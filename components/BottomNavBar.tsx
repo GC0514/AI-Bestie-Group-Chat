@@ -1,6 +1,6 @@
 
 import React, { useContext } from 'react';
-import { ChatIcon, ContactsIcon, MeIcon } from './Icons';
+import { ChatIcon, ContactsIcon, MeIcon, MomentsIcon } from './Icons';
 import { LocalizationContext } from '../App';
 import type { View } from '../types';
 
@@ -36,6 +36,12 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, setActiveView }
                 icon={<ChatIcon isActive={activeView === 'chats'} className="w-6 h-6" />}
                 isActive={activeView === 'chats'}
                 onClick={() => setActiveView('chats')}
+            />
+            <NavButton
+                label={t('moments')}
+                icon={<MomentsIcon isActive={activeView === 'moments'} className="w-6 h-6" />}
+                isActive={activeView === 'moments'}
+                onClick={() => setActiveView('moments')}
             />
             <NavButton
                 label={t('contacts')}

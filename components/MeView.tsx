@@ -2,19 +2,20 @@
 import React, { useContext } from 'react';
 import type { UserProfile, Theme } from '../types';
 import { LocalizationContext } from '../App';
-import { DiaryIcon, ProfileIcon, ExportIcon, ImportIcon, ThemeIcon, LanguageIcon, UserIcon } from './Icons';
+import { DiaryIcon, ProfileIcon, ExportIcon, ImportIcon, ThemeIcon, LanguageIcon, UserIcon, MemoryIcon } from './Icons';
 
 interface MeViewProps {
     userProfile: UserProfile | null;
     onEditProfile: () => void;
     onShowDiary: () => void;
+    onShowMemories: () => void;
     theme: Theme;
     setTheme: (theme: Theme) => void;
     onExport: () => void;
     onImport: () => void;
 }
 
-const MeView: React.FC<MeViewProps> = ({ userProfile, onEditProfile, onShowDiary, theme, setTheme, onExport, onImport }) => {
+const MeView: React.FC<MeViewProps> = ({ userProfile, onEditProfile, onShowDiary, onShowMemories, theme, setTheme, onExport, onImport }) => {
     const { t, language, setLanguage } = useContext(LocalizationContext);
 
     if (!userProfile) {
@@ -40,6 +41,7 @@ const MeView: React.FC<MeViewProps> = ({ userProfile, onEditProfile, onShowDiary
                     {/* Main Actions */}
                     <div className="bg-[var(--ui-panel-bg)] rounded-lg border border-[var(--ui-border)]">
                         <MenuItem icon={<DiaryIcon isActive className="w-5 h-5 text-yellow-400" />} label={t('myDiary')} onClick={onShowDiary} />
+                        <MenuItem icon={<MemoryIcon className="w-5 h-5 text-sky-400" />} label={t('myMemories')} onClick={onShowMemories} />
                         <MenuItem icon={<ProfileIcon />} label={t('editProfile')} onClick={onEditProfile} />
                     </div>
 

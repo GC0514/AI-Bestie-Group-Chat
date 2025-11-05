@@ -10,6 +10,7 @@ interface ChatWindowProps {
   conversation: Conversation;
   onSendMessage: (text: string, chatId: ConversationID | null) => void;
   onGenerateDiary: (chatId: ConversationID | null) => void;
+  onReact: (chatId: ConversationID, messageTimestamp: number, emoji: string) => void;
   isLoading: boolean;
   onBack?: () => void;
 }
@@ -58,7 +59,7 @@ const TypingIndicator: React.FC<{personaName?: PersonaName}> = ({ personaName })
     )
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, onGenerateDiary, isLoading, onBack }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, onGenerateDiary, onReact, isLoading, onBack }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,7 +84,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, onSendMessage, on
         className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
       >
         {conversation.messages.map((msg, index) => (
-          <ChatBubble key={`${conversation.id}-${index}`} message={msg} />
+          <ChatBubble 
+            key={`${conversation.id}-${msg.timestamp}-${index}`} 
+            message={msg}
+            onReact={(emoji) => onReact(conversation.id, msg.timestamp || 0, emoji)}
+          />
         ))}
         {isLoading && (
             <TypingIndicator personaName={conversation.isGroup ? undefined : conversation.id as PersonaName} />

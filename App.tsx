@@ -1,8 +1,8 @@
 
 
 import React, { useState, useEffect, useCallback, useRef, useContext } from 'react';
-import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData, PersonaInterests, RegenerationSource, View } from './types';
-import { getBestiesResponse, getSingleBestieResponse, generateDiaryEntry as generateDiaryEntryService, getProactiveGreeting, extractMemories } from './services/geminiService';
+import type { ChatMessage, Conversation, ConversationID, PersonaName, Theme, Language, UserProfile, DiaryEntry, CombinedData, PersonaInterests, RegenerationSource, View, Pact, Moment } from './types';
+import { getBestiesResponse, getSingleBestieResponse, generateDiaryEntry as generateDiaryEntryService, getProactiveGreeting, extractMemories, generateMoment, extractPact } from './services/geminiService';
 import { PERSONA_INTEREST_MAP } from './data/interests';
 import { PERSONAS } from './data/personas';
 import { locales } from './data/locales';
@@ -18,6 +18,9 @@ import ProfileModal from './components/ProfileModal';
 import RegenerateDiaryModal from './components/RegenerateDiaryModal';
 import BottomNavBar from './components/BottomNavBar';
 import MeView from './components/MeView';
+import MomentsView from './components/MomentsView';
+import MemoryView from './components/MemoryView';
+
 
 export const LocalizationContext = React.createContext({
   t: (key: string) => locales.en[key] || key,
@@ -110,18 +113,29 @@ const AppContent: React.FC = () => {
     }
   });
 
+  const [moments, setMoments] = useState<Moment[]>(() => {
+    try {
+      const savedMoments = localStorage.getItem('moments');
+      return savedMoments ? JSON.parse(savedMoments) : [];
+    } catch (error) {
+      console.error("Failed to load moments from localStorage", error);
+      return [];
+    }
+  });
+
   const [personaInterests, setPersonaInterests] = useState<PersonaInterests>({});
   const [activeChatId, setActiveChatId] = useState<ConversationID | null>('group');
-  const [isChatOpen, setIsChatOpen] = useState(false); // New state for mobile navigation
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [theme, setTheme] = useState<Theme>('light');
-  const { language } = useContext(LocalizationContext);
+  const { language, t } = useContext(LocalizationContext);
   const [activeView, setActiveView] = useState<View>('chats');
   const [profileCardPersona, setProfileCardPersona] = useState<PersonaName | null>(null);
   const [isProfileModalOpen, setProfileModalOpen] = useState(false);
   const [isRegenerateModalOpen, setRegenerateModalOpen] = useState(false);
   const [diaryToRegenerate, setDiaryToRegenerate] = useState<DiaryEntry | null>(null);
   const [isDiaryViewOpen, setIsDiaryViewOpen] = useState(false);
+  const [isMemoryViewOpen, setIsMemoryViewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -150,33 +164,28 @@ const AppContent: React.FC = () => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // All localStorage useEffects
   useEffect(() => {
-    try {
-      localStorage.setItem('conversations', JSON.stringify(conversations));
-    } catch (error) {
-      console.error("Failed to save conversations to localStorage", error);
-    }
+    try { localStorage.setItem('conversations', JSON.stringify(conversations)); } 
+    catch (e) { console.error("Failed to save conversations", e); }
   }, [conversations]);
 
   useEffect(() => {
-    try {
-        if (userProfile) {
-            localStorage.setItem('userProfile', JSON.stringify(userProfile));
-        }
-    } catch (error) {
-        console.error("Failed to save user profile from localStorage", error);
-    }
+    try { if (userProfile) localStorage.setItem('userProfile', JSON.stringify(userProfile)); }
+    catch (e) { console.error("Failed to save user profile", e); }
   }, [userProfile]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('diaryEntries', JSON.stringify(diaryEntries));
-    } catch (error) {
-      console.error("Failed to save diary entries to localStorage", error);
-    }
+    try { localStorage.setItem('diaryEntries', JSON.stringify(diaryEntries)); }
+    catch (e) { console.error("Failed to save diary entries", e); }
   }, [diaryEntries]);
 
+  useEffect(() => {
+    try { localStorage.setItem('moments', JSON.stringify(moments)); }
+    catch (e) { console.error("Failed to save moments", e); }
+  }, [moments]);
 
+  // Proactive Greeting
   useEffect(() => {
     const handleProactiveGreeting = async () => {
         if (!userProfile || !conversations.group) return;
@@ -248,6 +257,38 @@ const AppContent: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language, userProfile]); 
 
+  // Generate Moments daily
+  useEffect(() => {
+    const generateDailyMoments = async () => {
+        const today = new Date().toISOString().split('T')[0];
+        const lastGenerated = localStorage.getItem('momentsLastGenerated');
+        if (lastGenerated === today || !userProfile) return;
+
+        console.log("Generating daily moments...");
+        const personaNames = Object.keys(PERSONAS) as PersonaName[];
+        const shuffled = personaNames.sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, Math.floor(Math.random() * 3) + 2); // 2 to 4 moments
+
+        const newMomentsPromises = selected.map(async (pName) => {
+            const content = await generateMoment(pName, language);
+            if (!content) return null;
+            return {
+                id: `${Date.now()}-${pName}`,
+                personaName: pName,
+                content: content,
+                timestamp: Date.now() - Math.random() * 86400000, // Post at a random time in the last 24h
+            };
+        });
+
+        const results = (await Promise.all(newMomentsPromises)).filter((m): m is Moment => m !== null);
+        if (results.length > 0) {
+          setMoments(prev => [...results, ...prev].sort((a,b) => b.timestamp - a.timestamp).slice(0, 50));
+        }
+        localStorage.setItem('momentsLastGenerated', today);
+    };
+    const timer = setTimeout(generateDailyMoments, 3000); // Generate after 3s delay
+    return () => clearTimeout(timer);
+  }, [language, userProfile]);
 
   const startPrivateChat = useCallback((personaName: PersonaName) => {
     if (!conversations[personaName]) {
@@ -321,6 +362,7 @@ const AppContent: React.FC = () => {
         });
     }, 35000);
 
+    // Side-effects: memory and pact extraction (no need to await)
     extractMemories(text, language).then(newMemories => {
         if (Object.keys(newMemories).length > 0) {
             setUserProfile(prevProfile => {
@@ -329,9 +371,18 @@ const AppContent: React.FC = () => {
                 return { ...prevProfile, keyMemories: updatedMemories };
             });
         }
-    }).catch(error => {
-        console.error("Failed to extract memories:", error);
-    });
+    }).catch(error => { console.error("Failed to extract memories:", error); });
+    
+    extractPact(text, language).then(pact => {
+        if(pact) {
+            const pactMessage: ChatMessage = { sender: 'System', text: `Got it, I'll remember: ${pact.content}`, timestamp: Date.now() };
+            setConversations(prev => ({
+                ...prev,
+                [chatId]: { ...prev[chatId]!, messages: [...prev[chatId]!.messages, pactMessage] }
+            }));
+        }
+    }).catch(error => { console.error("Failed to extract pact:", error); });
+
 
     try {
       if (chatId === 'group') {
@@ -342,7 +393,7 @@ const AppContent: React.FC = () => {
         
         let cumulativeDelay = 0;
         aiResponses.forEach((res) => {
-            const thinkingPause = Math.random() * 1800 + 500; // 0.5s to 2.3s pause before this message appears
+            const thinkingPause = Math.random() * 1800 + 500;
             cumulativeDelay += thinkingPause;
             
             setTimeout(() => {
@@ -389,6 +440,25 @@ const AppContent: React.FC = () => {
     }
   }, [language, userProfile, conversations, clearLoadingTimeout, personaInterests]);
 
+  const handleReaction = (chatId: ConversationID, messageTimestamp: number, emoji: string) => {
+    setConversations(prev => {
+        const newConversations = { ...prev };
+        const convo = newConversations[chatId];
+        if (convo) {
+            const messageIndex = convo.messages.findIndex(m => m.timestamp === messageTimestamp);
+            if (messageIndex !== -1) {
+                const updatedMessages = [...convo.messages];
+                updatedMessages[messageIndex] = {
+                    ...updatedMessages[messageIndex],
+                    userReaction: emoji,
+                };
+                newConversations[chatId] = { ...convo, messages: updatedMessages };
+            }
+        }
+        return newConversations;
+    });
+  };
+
   const handleGenerateDiary = useCallback(async (chatId: ConversationID | null) => {
     if (!userProfile || !chatId) return;
     const conversation = conversations[chatId];
@@ -427,7 +497,7 @@ const AppContent: React.FC = () => {
     } else if (source === 'group') {
         messagesToProcess = conversations.group?.messages.filter(m => m.sender === 'Me') || [];
     } else if (source === 'all') {
-        // FIX: The error was caused by incorrect iteration. Using `for...of` with `Object.values` correctly gathers messages from all conversations.
+        // FIX: The `for...of` loop cannot iterate directly over an object. `Object.values()` must be used to get an array of the conversations.
         for (const convo of Object.values(conversations)) {
             if (convo) {
                 messagesToProcess.push(...convo.messages.filter(m => m.sender === 'Me'));
@@ -445,7 +515,7 @@ const AppContent: React.FC = () => {
         const { title, content } = await generateDiaryEntryService(messagesToProcess, language, userProfile);
         setDiaryEntries(prev => prev.map(entry => 
             entry.date === entryToRegen.date && entry.title === entryToRegen.title
-            ? { ...entry, title, content } // Update content and title, keep original date and source
+            ? { ...entry, title, content }
             : entry
         ));
     } catch (error) {
@@ -461,11 +531,7 @@ const AppContent: React.FC = () => {
   };
   
   const handleExportData = () => {
-    const data: CombinedData = {
-        userProfile,
-        conversations,
-        diaryEntries,
-    };
+    const data: CombinedData = { userProfile, conversations, diaryEntries };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -499,13 +565,10 @@ const AppContent: React.FC = () => {
                     const importedConversations = data.conversations;
                     if (!importedConversations.group) {
                         importedConversations.group = {
-                            id: 'group',
-                            name: '闺蜜团 (Group Chat)',
-                            messages: [{ sender: 'System', text: "Welcome back! Your besties missed you.", timestamp: Date.now() }],
-                            isGroup: true,
+                            id: 'group', name: '闺蜜团 (Group Chat)',
+                            messages: [{ sender: 'System', text: "Welcome back! Your besties missed you.", timestamp: Date.now() }], isGroup: true,
                         };
                     }
-
                     setUserProfile(data.userProfile);
                     setConversations(importedConversations);
                     setDiaryEntries(data.diaryEntries);
@@ -540,6 +603,7 @@ const AppContent: React.FC = () => {
               conversation={activeConversation}
               onSendMessage={handleSendMessage}
               onGenerateDiary={handleGenerateDiary}
+              onReact={handleReaction}
               isLoading={isLoading}
               onBack={() => setIsChatOpen(false)}
             />
@@ -548,6 +612,9 @@ const AppContent: React.FC = () => {
     if (isDiaryViewOpen) {
       return <DiaryView entries={diaryEntries} onRegenerate={openRegenerateModal} onBack={() => setIsDiaryViewOpen(false)} />;
     }
+    if (isMemoryViewOpen) {
+      return <MemoryView userProfile={userProfile!} setUserProfile={setUserProfile} onBack={() => setIsMemoryViewOpen(false)} />;
+    }
 
     switch (activeView) {
       case 'chats':
@@ -555,13 +622,12 @@ const AppContent: React.FC = () => {
           <ChatList
             conversations={Object.values(conversations)}
             activeChatId={activeChatId}
-            onSelectChat={(id) => {
-              setActiveChatId(id);
-              setIsChatOpen(true);
-            }}
+            onSelectChat={(id) => { setActiveChatId(id); setIsChatOpen(true); }}
             onCloseChat={handleCloseChat}
           />
         );
+      case 'moments':
+        return <MomentsView moments={moments} />;
       case 'contacts':
         return <ContactsView onSelectPersona={setProfileCardPersona} />;
       case 'me':
@@ -570,6 +636,7 @@ const AppContent: React.FC = () => {
             userProfile={userProfile}
             onEditProfile={() => setProfileModalOpen(true)}
             onShowDiary={() => setIsDiaryViewOpen(true)}
+            onShowMemories={() => setIsMemoryViewOpen(true)}
             theme={theme}
             setTheme={setTheme}
             onExport={handleExportData}
@@ -602,15 +669,15 @@ const AppContent: React.FC = () => {
                     <ChatList
                       conversations={Object.values(conversations)}
                       activeChatId={activeChatId}
-                      onSelectChat={(id) => {
-                          setActiveChatId(id);
-                      }}
+                      onSelectChat={(id) => { setActiveChatId(id); }}
                       onCloseChat={handleCloseChat}
                     />
                   ) : activeView === 'contacts' ? (
                      <ContactsView onSelectPersona={setProfileCardPersona} />
-                  ): (
+                  ): activeView === 'diary' ? (
                     <DiaryView entries={diaryEntries} onRegenerate={openRegenerateModal} />
+                  ) : (
+                    <MomentsView moments={moments} />
                   )}
                 </div>
             </div>
@@ -622,6 +689,7 @@ const AppContent: React.FC = () => {
                   conversation={activeConversation}
                   onSendMessage={handleSendMessage}
                   onGenerateDiary={handleGenerateDiary}
+                  onReact={handleReaction}
                   isLoading={isLoading}
                 />
               ) : (
@@ -636,7 +704,7 @@ const AppContent: React.FC = () => {
             <main className="flex-1 overflow-y-auto pb-16">
               {renderMobileView()}
             </main>
-            {!isChatOpen && !isDiaryViewOpen && <BottomNavBar activeView={activeView} setActiveView={setActiveView} />}
+            {!isChatOpen && !isDiaryViewOpen && !isMemoryViewOpen && <BottomNavBar activeView={activeView} setActiveView={setActiveView} />}
           </div>
           
           {profileCardPersona && (

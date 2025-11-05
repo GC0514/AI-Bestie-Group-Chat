@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import type { ChatMessage, PersonaName, Language, UserProfile, DiaryEntry, ProactiveContext, PersonaInterests } from '../types';
+import type { ChatMessage, PersonaName, Language, UserProfile, DiaryEntry, ProactiveContext, PersonaInterests, Pact } from '../types';
 import { 
   getSystemPromptGroupOptimized,
   personaDetailsForPrompt, 
@@ -8,7 +9,9 @@ import {
   getSystemPromptSingle, 
   getSystemPromptDiary, 
   getSystemPromptProactiveGreeting,
-  getSystemPromptMemoryExtraction
+  getSystemPromptMemoryExtraction,
+  getSystemPromptMomentGeneration,
+  getSystemPromptPactExtraction,
 } from '../prompts/systemPrompts';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
@@ -95,6 +98,15 @@ const memoryExtractionSchema = {
             description: "Objective facts about the user."
         }
     },
+};
+
+const pactExtractionSchema = {
+    type: Type.OBJECT,
+    properties: {
+        date: { type: Type.STRING, description: 'The date of the event in YYYY-MM-DD format, or null if not specific.', nullable: true },
+        content: { type: Type.STRING, description: 'A short description of the event.' },
+    },
+    required: ["date", "content"],
 };
 
 
@@ -315,5 +327,64 @@ export async function extractMemories(userMessage: string, lang: Language): Prom
     } catch (error) {
         console.error("Error extracting memories:", error);
         return {}; // Fail silently
+    }
+}
+
+export async function generateMoment(personaName: PersonaName, lang: Language): Promise<string> {
+    try {
+        const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `Please generate a moment for ${personaName}.`,
+            config: {
+                systemInstruction: getSystemPromptMomentGeneration(personaName, lang),
+                temperature: 0.9,
+            }
+        }), API_TIMEOUT);
+        
+        const text = response.text.trim();
+        if (!text) {
+             console.warn(`Received empty response from API for moment generation for ${personaName}.`);
+             return "";
+        }
+        return text;
+    } catch (error) {
+        console.error(`Error generating moment for ${personaName}:`, error);
+        return ""; // Fail silently
+    }
+}
+
+export async function extractPact(userMessage: string, lang: Language): Promise<Omit<Pact, 'id' | 'acknowledged'> | null> {
+    try {
+        const response: GenerateContentResponse = await withTimeout(ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: userMessage,
+            config: {
+                systemInstruction: getSystemPromptPactExtraction(lang),
+                responseMimeType: "application/json",
+                responseSchema: pactExtractionSchema,
+                temperature: 0.0,
+            }
+        }), API_TIMEOUT);
+
+        let parsedResponse;
+        try {
+            const jsonText = response.text.trim();
+            if (!jsonText || jsonText.toLowerCase() === 'null') {
+                return null;
+            }
+            parsedResponse = JSON.parse(jsonText);
+        } catch (parseError) {
+            console.debug("Could not parse pact from text:", response.text);
+            return null;
+        }
+
+        if (parsedResponse && parsedResponse.content) {
+            return parsedResponse as Omit<Pact, 'id' | 'acknowledged'>;
+        }
+        return null;
+
+    } catch (error) {
+        console.error("Error extracting pact:", error);
+        return null; // Fail silently
     }
 }
